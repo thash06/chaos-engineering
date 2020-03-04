@@ -3,17 +3,22 @@ package com.fidelity.fbt.resiliency.refapp.service;
 import com.fidelity.fbt.resiliency.refapp.enums.CouponType;
 import com.fidelity.fbt.resiliency.refapp.enums.MarketType;
 import com.fidelity.fbt.resiliency.refapp.enums.ProductType;
+import com.fidelity.fbt.resiliency.refapp.exception.ChaosEngineeringException;
 import com.fidelity.fbt.resiliency.refapp.model.MockClientServiceResponse;
 import com.fidelity.fbt.resiliency.refapp.model.Offering;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.web.client.RestTemplate;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * @author souadhik
@@ -21,6 +26,7 @@ import java.util.List;
  */
 @Service
 public class ResiliencyDataServiceImpl implements ResiliencyDataService {
+    private AtomicInteger atomicInteger = new AtomicInteger(0);
 
     /**
      * Configuration for remote service Url, specified in properties file
@@ -42,6 +48,20 @@ public class ResiliencyDataServiceImpl implements ResiliencyDataService {
 
     //@HystrixCommand(fallbackMethod ="fallbackOnFailure")
     public Object getDatafromRemoteServiceForFallbackPattern() {
+
+        int count = atomicInteger.incrementAndGet();
+        if(count % 3 == 0){
+            throw new ChaosEngineeringException("This exception is ignored by the CircuitBreaker of ChaosEngineeringDataService: Count of int " + atomicInteger.get());
+        }
+        else if(count % 5 == 0){
+            throw new HttpClientErrorException(HttpStatus.BAD_REQUEST, "This is a remote client exception: Count of int " + atomicInteger.get());
+        }
+        else if(count % 7 == 0){
+            throw new HttpServerErrorException(HttpStatus.INTERNAL_SERVER_ERROR, "This is a remote exception: Count of int " + atomicInteger.get());
+        }
+        else if(count % 11 == 0){
+            throw new RuntimeException("This is a runtime exception: Count of int " + atomicInteger.get());
+        }
 
         Object responseEntity = this.restTemplate.getForObject(remoteServerUrl, Object.class);
 
