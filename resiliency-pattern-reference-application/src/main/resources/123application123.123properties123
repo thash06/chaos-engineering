@@ -1,0 +1,2 @@
+server.port=8081
+remote.server.url=/data-service/offerings
