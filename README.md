@@ -57,8 +57,15 @@ A few settings can be configured for a Circuit Breaker:
 4. A Predicate which evaluates if an exception should count as a failure.
 
 
-The code snippet below configures the CircuitBreaker registers it against a global name and then attaches it to the method supplier. 
-The failureRateThreshold value specfies what percentage of remote calls should fail for the state to change from CLOSED to OPEN. 
+The code snippet below configures the CircuitBreaker and registers it against a global name and then attaches it to the method supplier. 
+A few important settings are discussed below and the rest are self explanatory.
+The failureRateThreshold value specifies what percentage of remote calls should fail for the state to change from CLOSED to OPEN. 
+The slidingWindowSize() property specifies the number of calls which will be used to determine the failure threshold percentage.
+Eg: If in the last 5 remote calls 20% or 1 call failed due to  ConnectException.class, ResourceAccessException.class then the 
+CircuitBreaker status changes to OPEN.
+It stays in Open state for waitDurationInOpenState() milliseconds then then allows the number  specified in
+permittedNumberOfCallsInHalfOpenState() to go through to determine if the status can go back to CLOSED or stay in OPEN.
+
     private <T> T executeWithRetryAndCircuitBreaker(Supplier<T> supplier, Function<Throwable, T> fallback) {
         return Decorators.ofSupplier(supplier)
                 .withCircuitBreaker(circuitBreaker)
@@ -67,10 +74,10 @@ The failureRateThreshold value specfies what percentage of remote calls should f
 
     private CircuitBreaker createCircuitBreaker() {
         CircuitBreakerConfig circuitBreakerConfig = CircuitBreakerConfig.custom()
-                .failureRateThreshold(25)
+                .failureRateThreshold(20)
                 .waitDurationInOpenState(Duration.ofMillis(10000))
                 .permittedNumberOfCallsInHalfOpenState(2)
-                .slidingWindowSize(2)
+                .slidingWindowSize(5)
                 .recordExceptions(ConnectException.class, ResourceAccessException.class)
                 .ignoreExceptions(ChaosEngineeringException.class)
                 .build();
