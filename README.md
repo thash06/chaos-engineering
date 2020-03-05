@@ -22,3 +22,13 @@ The code snippet below creates a retry config which allows a maximum of 5 retrie
                 .retryExceptions(ConnectException.class, ResourceAccessException.class)
                 .build();
     }
+ The example above could very well be tuned to return a default cached/default reponse rather than retry with a single line code change.
+ 
+    private <T> T executeWithRetry(Supplier<T> supplier, Function<Throwable, T> fallback) {
+        retry = Retry.of(DATA_SERVICE, this::createRetryConfig);
+        // Create a RetryRegistry with a custom global configuration
+        retryRegistry = RetryRegistry.of(createRetryConfig());
+        return Decorators.ofSupplier(supplier)
+                .withFallback(Arrays.asList(ConnectException.class, ResourceAccessException.class), fallback)
+                .get();
+    }
