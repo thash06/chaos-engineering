@@ -32,3 +32,29 @@ The code snippet below creates a retry config which allows a maximum of 5 retrie
                 .withFallback(Arrays.asList(ConnectException.class, ResourceAccessException.class), fallback)
                 .get();
     }
+    
+#CircuitBreaker
+In cases where default value is not an option and the remote system does not "heal" or respond even after repeated retries we can prevent furthur calls to the downstream system. The Circuit Breaker is one such method which helps us in preventing a cascade of failures when a remote service is down.
+CircuitBreaker has 3 states
+OPEN -  Rejects calls to remote service with a CallNotPermittedException when it is OPEN.
+HALF_OPEN - Permits a configurable number of calls to see if the backend is still unavailable or has become available again.
+CLOSED - Calls can be made to the remote system. This happens when the failure rate and slow call rate is below the threshold.
+
+Two other states are also supported
+DISABLED - always allow access.
+FORCED_OPEN - always deny access
+
+The transition happens from CLOSED to OPEN state when based upon 
+1. How many of the last N calls have failed(Count based sliding window) or  
+2. How many failures did we have in the last N minutes(or any other duration) called Time based sliding window.
+
+
+A few settings can be configured for a Circuit Breaker:
+
+1. The failure rate threshold above which the CircuitBreaker opens and starts short-circuiting calls
+2. The wait duration which defines how long the CircuitBreaker should stay open before it switches to HALF_OPEN.
+3. A custom CircuitBreakerEventListener which handles CircuitBreaker events
+4. A Predicate which evaluates if an exception should count as a failure.
+
+
+
