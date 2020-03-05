@@ -8,6 +8,7 @@ import io.github.resilience4j.bulkhead.BulkheadRegistry;
 import io.github.resilience4j.bulkhead.ThreadPoolBulkhead;
 import io.github.resilience4j.bulkhead.ThreadPoolBulkheadRegistry;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import io.github.resilience4j.core.IntervalFunction;
 import io.github.resilience4j.decorators.Decorators;
@@ -20,10 +21,12 @@ import io.github.resilience4j.timelimiter.TimeLimiter;
 import io.github.resilience4j.timelimiter.TimeLimiterRegistry;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.client.ResourceAccessException;
 
 import java.net.ConnectException;
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -43,7 +46,7 @@ public class ResiliencyPatternsController {
      * Data layer dependency for invoking data methods
      */
     private final ResiliencyDataService resiliencyDataService;
-    private final CircuitBreaker circuitBreaker;
+    private CircuitBreaker circuitBreaker;
     private final Bulkhead bulkhead;
     private final ThreadPoolBulkhead threadPoolBulkhead;
     private Retry retry;
@@ -54,27 +57,34 @@ public class ResiliencyPatternsController {
 
     public ResiliencyPatternsController(
             ResiliencyDataService resiliencyDataService,
-            CircuitBreakerRegistry circuitBreakerRegistry,
             ThreadPoolBulkheadRegistry threadPoolBulkheadRegistry,
             BulkheadRegistry bulkheadRegistry,
             RateLimiterRegistry rateLimiterRegistry,
             TimeLimiterRegistry timeLimiterRegistry) {
         //this.chaosEngineeringDataService = chaosEngineeringDataService;
         this.resiliencyDataService = resiliencyDataService;
-        this.circuitBreaker = circuitBreakerRegistry.circuitBreaker(DATA_SERVICE);
         this.bulkhead = bulkheadRegistry.bulkhead(DATA_SERVICE);
         this.threadPoolBulkhead = threadPoolBulkheadRegistry.bulkhead(DATA_SERVICE);
         this.rateLimiter = rateLimiterRegistry.rateLimiter(DATA_SERVICE);
         this.timeLimiter = timeLimiterRegistry.timeLimiter(DATA_SERVICE);
         this.scheduledExecutorService = Executors.newScheduledThreadPool(3);
+        this.circuitBreaker = createCircuitBreaker();
     }
 
     /**
      * @return This endpoint returns mock response for demonstrating fallback resiliency pattern
      */
     @GetMapping("/fallback")
-    public Object getMockOfferings() {
-        return executeWithRetry(resiliencyDataService::getDatafromRemoteServiceForFallbackPattern, this::fallback);
+    public Object getMockOfferings(@RequestParam String feature) {
+        switch (feature) {
+            case "retry":
+                return executeWithRetry(resiliencyDataService::getDatafromRemoteServiceForFallbackPattern, this::fallback);
+            case "circuit-breaker":
+                return executeWithRetryAndCircuitBreaker(resiliencyDataService::getDatafromRemoteServiceForFallbackPattern, this::fallback);
+            default:
+                return resiliencyDataService.getDatafromRemoteServiceForFallbackPattern();
+        }
+
     }
 
     private <T> T execute(Supplier<T> supplier, Function<Throwable, T> fallback) {
@@ -82,7 +92,6 @@ public class ResiliencyPatternsController {
                 .withRetry(retry)
                 .withCircuitBreaker(circuitBreaker)
                 .withBulkhead(bulkhead)
-
                 .withRateLimiter(rateLimiter)
                 .withFallback(Arrays.asList(ChaosEngineeringException.class), fallback)
                 .get();
@@ -90,18 +99,42 @@ public class ResiliencyPatternsController {
     }
 
     private <T> T executeWithRetry(Supplier<T> supplier, Function<Throwable, T> fallback) {
-        Retry retry = Retry.of(DATA_SERVICE, this::createRetryConfig);
+        retry = Retry.of(DATA_SERVICE, this::createRetryConfig);
         // Create a RetryRegistry with a custom global configuration
         retryRegistry = RetryRegistry.of(createRetryConfig());
-        return Retry.decorateSupplier(retry, supplier).get();
+        return Decorators.ofSupplier(supplier)
+                //.withFallback(Arrays.asList(ConnectException.class, ResourceAccessException.class), fallback)
+                .withRetry(retry)
+                .get();
+    }
+
+    private <T> T executeWithRetryAndCircuitBreaker(Supplier<T> supplier, Function<Throwable, T> fallback) {
+        retry = Retry.of(DATA_SERVICE, this::createRetryConfig);
+        return Decorators.ofSupplier(supplier)
+                .withRetry(retry)
+                .withCircuitBreaker(circuitBreaker)
+                .get();
+    }
+
+    private CircuitBreaker createCircuitBreaker() {
+        CircuitBreakerConfig circuitBreakerConfig = CircuitBreakerConfig.custom()
+                .failureRateThreshold(25)
+                .waitDurationInOpenState(Duration.ofMillis(10000))
+                .permittedNumberOfCallsInHalfOpenState(2)
+                .slidingWindowSize(2)
+                .recordExceptions(ConnectException.class, ResourceAccessException.class)
+                .ignoreExceptions(ChaosEngineeringException.class)
+                .build();
+        CircuitBreakerRegistry circuitBreakerRegistry = CircuitBreakerRegistry.of(circuitBreakerConfig);
+        return circuitBreakerRegistry.circuitBreaker(DATA_SERVICE);
     }
 
     private RetryConfig createRetryConfig() {
         IntervalFunction intervalWithCustomExponentialBackoff = IntervalFunction
-                .ofExponentialBackoff(5000l, 2d);
+                .ofExponentialBackoff(500l, 2d);
         return RetryConfig.custom()
                 .intervalFunction(intervalWithCustomExponentialBackoff)
-                .maxAttempts(5)
+                .maxAttempts(3)
                 .retryExceptions(ConnectException.class, ResourceAccessException.class)
                 .build();
     }
