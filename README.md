@@ -57,4 +57,23 @@ A few settings can be configured for a Circuit Breaker:
 4. A Predicate which evaluates if an exception should count as a failure.
 
 
+The code snippet below configures the CircuitBreaker registers it against a global name and then attaches it to the method supplier. 
+The failureRateThreshold value specfies what percentage of remote calls should fail for the state to change from CLOSED to OPEN. 
+    private <T> T executeWithRetryAndCircuitBreaker(Supplier<T> supplier, Function<Throwable, T> fallback) {
+        return Decorators.ofSupplier(supplier)
+                .withCircuitBreaker(circuitBreaker)
+                .get();
+    }
 
+    private CircuitBreaker createCircuitBreaker() {
+        CircuitBreakerConfig circuitBreakerConfig = CircuitBreakerConfig.custom()
+                .failureRateThreshold(25)
+                .waitDurationInOpenState(Duration.ofMillis(10000))
+                .permittedNumberOfCallsInHalfOpenState(2)
+                .slidingWindowSize(2)
+                .recordExceptions(ConnectException.class, ResourceAccessException.class)
+                .ignoreExceptions(ChaosEngineeringException.class)
+                .build();
+        CircuitBreakerRegistry circuitBreakerRegistry = CircuitBreakerRegistry.of(circuitBreakerConfig);
+        return circuitBreakerRegistry.circuitBreaker(DATA_SERVICE);
+    }
