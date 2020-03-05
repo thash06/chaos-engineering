@@ -1,6 +1,6 @@
-# chaos-engineering
+# Chaos-engineering
 
-#Retry with exponential backoff.
+# Retry with exponential backoff.
 In the even of failure due to unavailability or any of the Exceptions listed in retryExceptions() menthod listed below, applications can choose to return a fallback/default return value or choose to keep the connection open and retry the endpoint which threw the error.
 The retry logic can make use of a feature called exponential backoff. 
 
@@ -33,7 +33,7 @@ The code snippet below creates a retry config which allows a maximum of 5 retrie
                 .get();
     }
     
-#CircuitBreaker
+# CircuitBreaker
 In cases where default value is not an option and the remote system does not "heal" or respond even after repeated retries we can prevent furthur calls to the downstream system. The Circuit Breaker is one such method which helps us in preventing a cascade of failures when a remote service is down.
 CircuitBreaker has 3 states
 OPEN -  Rejects calls to remote service with a CallNotPermittedException when it is OPEN.
