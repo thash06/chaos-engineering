@@ -120,7 +120,6 @@ Applying a Bulkhead decorator to a service can be done in 2 easy steps.
                    .maxConcurrentCalls(maxConcurrentCalls)
                    .maxWaitDuration(Duration.ofMillis(maxWaitDuration))
                    .build();
-   
            BulkheadRegistry bulkheadRegistry = BulkheadRegistry.of(bulkheadConfig);
            return bulkheadRegistry.bulkhead(DATA_SERVICE);
     }
