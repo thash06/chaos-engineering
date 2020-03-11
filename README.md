@@ -15,7 +15,6 @@ The code snippet below creates a retry config which allows a maximum of 5 retrie
 
     private <T> T executeWithRetry(Supplier<T> supplier, Function<Throwable, T> fallback) {
         Retry retry = Retry.of(DATA_SERVICE, this::createRetryConfig);
-        // Create a RetryRegistry with a custom global configuration
         retryRegistry = RetryRegistry.of(createRetryConfig());
         return Retry.decorateSupplier(retry, supplier).get();
     }
@@ -134,18 +133,15 @@ Applying a Bulkhead decorator to a service can be done in 2 easy steps.
             bulkhead.getEventPublisher()
                     .onCallPermitted(event -> {
                         successfulRemoteCalls.add(Thread.currentThread().getName());
-                        //LOGGER.info("Successful remote call {} ", Thread.currentThread().getName());
                     })
                     .onCallRejected(event -> {
                         rejectedRemoteCalls.add(Thread.currentThread().getName());
-                        //LOGGER.error("Rejected remote call {} ", Thread.currentThread().getName());
                     })
                     .onCallFinished(event -> LOGGER.debug("Call Finished {} ", event));
             LOGGER.debug(Thread.currentThread().getName() + " successful. Return value = " + returnValue.getClass());
             returnValues.add(returnValue);
 
         } catch (Exception e) {
-            //LOGGER.error(Thread.currentThread().getName() + " threw exception " + e.getMessage());
             failedRequests.add(e);
         }
     }
