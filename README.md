@@ -123,7 +123,7 @@ Applying a Bulkhead decorator to a service can be done in 2 easy steps.
            return bulkheadRegistry.bulkhead(DATA_SERVICE);
        }
 2.  Decorate the service using the Bulkhead created above.
-        
+
         private <T> void callRemoteService(Bulkhead bulkhead, List<Object> returnValues, List<Exception> failedRequests, Set<String> successfulRemoteCalls, Set<String> rejectedRemoteCalls) {
             try {
                 Callable<T> callable = () -> (T) resiliencyDataService.getDatafromRemoteServiceForFallbackPattern();
