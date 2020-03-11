@@ -114,19 +114,19 @@ Applying a Bulkhead decorator to a service can be done in 2 easy steps.
     forwarded to the service otherwise a BulkheadFullException is thrown.
     
     
-    private Bulkhead createBulkhead(int maxConcurrentCalls, int maxWaitDuration) {
+    `private Bulkhead createBulkhead(int maxConcurrentCalls, int maxWaitDuration) {
            BulkheadConfig bulkheadConfig = BulkheadConfig.custom()
                    .maxConcurrentCalls(maxConcurrentCalls)
                    .maxWaitDuration(Duration.ofMillis(maxWaitDuration))
                    .build();
            BulkheadRegistry bulkheadRegistry = BulkheadRegistry.of(bulkheadConfig);
            return bulkheadRegistry.bulkhead(DATA_SERVICE);
-    }
+    }`
        
 2.  Decorate the service using the Bulkhead created above.
 
         
-    private <T> void callRemoteService(Bulkhead bulkhead, List<Object> returnValues, List<Exception> failedRequests, Set<String> successfulRemoteCalls, Set<String> rejectedRemoteCalls) {
+    `private <T> void callRemoteService(Bulkhead bulkhead, List<Object> returnValues, List<Exception> failedRequests, Set<String> successfulRemoteCalls, Set<String> rejectedRemoteCalls) {
         try {
             Callable<T> callable = () -> (T) resiliencyDataService.getDatafromRemoteServiceForFallbackPattern();
             T returnValue = bulkhead.executeCallable(callable);
@@ -144,7 +144,7 @@ Applying a Bulkhead decorator to a service can be done in 2 easy steps.
         } catch (Exception e) {
             failedRequests.add(e);
         }
-    }
+    }`
 
 
 The eventPublisher retrieved from the bulkhead gives the event details of the successful, rejected and finished events. Using which the user 
