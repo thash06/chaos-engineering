@@ -189,16 +189,6 @@ public class ResiliencyPatternsController {
         return (T) returnValues.get(returnValues.size() - 1);
     }
 
-    private <T> T callService(Bulkhead bulkhead) throws Exception {
-        Callable<T> callable = () -> (T) resiliencyDataService.getDatafromRemoteServiceForFallbackPattern();
-        T returnValue = bulkhead.executeCallable(callable);
-        bulkhead.getEventPublisher()
-                .onCallPermitted(event -> LOGGER.info(" Permitted Event {} ", event))
-                .onCallRejected(event -> LOGGER.error("Rejected Event {} ", event))
-                .onCallFinished(event -> LOGGER.info("Call Completed {} ", event));
-        return returnValue;
-    }
-
 //    private <T> T executeWithBulkhead(int maxConcurrentCalls, int maxWaitDuration, Supplier<T> supplier, Function<Throwable, T> fallback) {
 //        LOGGER.info("Creating Bulkhead with maxConcurrentCalls {} maxWaitDuration {} ", maxConcurrentCalls, maxWaitDuration);
 //        this.bulkhead = createBulkhead(maxConcurrentCalls, maxWaitDuration);
@@ -260,17 +250,13 @@ public class ResiliencyPatternsController {
     // If bulkhead has space available, entry is guaranteed and immediate else maxWaitDuration
     // specifies the maximum amount of time which the calling thread will wait to enter the bulkhead.
     private Bulkhead createBulkhead(int maxConcurrentCalls, int maxWaitDuration) {
-        int availableProcessors = Runtime.getRuntime()
-                .availableProcessors();
         BulkheadConfig bulkheadConfig = BulkheadConfig.custom()
                 .maxConcurrentCalls(maxConcurrentCalls)
                 .maxWaitDuration(Duration.ofMillis(maxWaitDuration))
                 .build();
 
         BulkheadRegistry bulkheadRegistry = BulkheadRegistry.of(bulkheadConfig);
-
         return bulkheadRegistry.bulkhead(DATA_SERVICE);
-
     }
 
     private RateLimiter createRateLimiter() {

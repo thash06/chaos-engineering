@@ -47,26 +47,7 @@ public class ResiliencyDataServiceImpl implements ResiliencyDataService {
 
     //@HystrixCommand(fallbackMethod ="fallbackOnFailure")
     public Object getDatafromRemoteServiceForFallbackPattern() {
-
-        int count = atomicInteger.incrementAndGet();
-//        if(count % 3 == 0){
-//            throw new ChaosEngineeringException("This exception is ignored by the CircuitBreaker of ChaosEngineeringDataService: Count of int " + atomicInteger.get());
-//        }
-//        else if(count % 5 == 0){
-//            throw new HttpClientErrorException(HttpStatus.BAD_REQUEST, "This is a remote client exception: Count of int " + atomicInteger.get());
-//        }
-//        else if(count % 7 == 0){
-//            throw new HttpServerErrorException(HttpStatus.INTERNAL_SERVER_ERROR, "This is a remote exception: Count of int " + atomicInteger.get());
-//        }
-//        else if(count % 11 == 0){
-//            throw new RuntimeException("This is a runtime exception: Count of int " + atomicInteger.get());
-//        }
-
         Object responseEntity = this.restTemplate.getForObject(remoteServerUrl, Object.class);
-
-
-        //MockClientServiceResponse response = responseEntity.getBody();
-        //response.setMessage("Remote service is online!");
         return responseEntity;
     }
 

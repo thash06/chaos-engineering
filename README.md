@@ -89,4 +89,43 @@ permittedNumberOfCallsInHalfOpenState() to go through to determine if the status
 Rate limiting is an imperative technique to prepare your API for scale and establish high availability and reliability of your service.
 
 # Bulkhead
-Used to limit the number of concurrent calls to a service. If clients send more than the number of concurrent calls (referred to as the saturation point and configured using the maxConcurrentCalls()) than the service is configured to handle, A Bulkhead decorated service protects it from getting overwhelmed by keeping the additional calls waiting for a preconfigured time (configured through maxWaitTime()). If during this wait time any of the threads handing the existing concurrent calls becomes available the waiting calls get their turn to execute else these calls are rejected by the Bulkhead decorator by throwing a BulkheadFullException stating that  "Bulkhead <bulkhead-name> is full and does not permit further calls".
+Used to limit the number of concurrent calls to a service. If clients send more than the number of concurrent calls 
+(**referred to as the saturation point and configured using the maxConcurrentCalls()**) than the service is configured to handle, 
+a Bulkhead decorated service protects it from getting overwhelmed by keeping the additional calls waiting for a preconfigured time 
+(**configured through maxWaitTime()**). 
+If during this wait time any of the threads handing the existing concurrent calls becomes available the waiting calls get their turn 
+to execute else these calls are rejected by the Bulkhead decorator by throwing a BulkheadFullException stating that  
+"Bulkhead _<bulkhead-name>_ is full and does not permit further calls".
+
+Applying a Bulkhead decorator to a service can be done in 2 easy steps.
+1.  Create a Bulkhead using custom or default configuration. In the example below the Bulkhead will allow the
+    service that it protected to accept _maxConcurrentCalls_ calls concurrently. While the request is being processed any new incoming request will be 
+    queued for _maxWaitDuration_ and if during this time any of the concurrent calls complete and frees up the Thread the waiting request will get 
+    forwarded to the service otherwise a BulkheadFullException is thrown.
+    private Bulkhead createBulkhead(int maxConcurrentCalls, int maxWaitDuration) {
+           BulkheadConfig bulkheadConfig = BulkheadConfig.custom()
+                   .maxConcurrentCalls(maxConcurrentCalls)
+                   .maxWaitDuration(Duration.ofMillis(maxWaitDuration))
+                   .build();
+   
+           BulkheadRegistry bulkheadRegistry = BulkheadRegistry.of(bulkheadConfig);
+           return bulkheadRegistry.bulkhead(DATA_SERVICE);
+       }
+2.  Decorate the service using the Bulkhead created above.
+            Callable<T> callable = () -> (T) resiliencyDataService.getDatafromRemoteServiceForFallbackPattern();
+            T returnValue = bulkhead.executeCallable(callable);
+            bulkhead.getEventPublisher()
+                    .onCallPermitted(event -> {
+                        successfulRemoteCalls.add(Thread.currentThread().getName());
+                        LOGGER.info("Successful remote call {} ", Thread.currentThread().getName());
+                    })
+                    .onCallRejected(event -> {
+                        rejectedRemoteCalls.add(Thread.currentThread().getName());
+                        LOGGER.error("Rejected remote call {} ", Thread.currentThread().getName());
+                    })
+                    .onCallFinished(event -> LOGGER.debug("Call Finished {} ", event));
+
+
+The eventPublisher retrieved from the bulkhead gives the event details of the successful, rejected and finished events. Using which the user 
+could determine how best to handle each of these events.
+ 
