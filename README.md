@@ -123,7 +123,7 @@ Applying a Bulkhead decorator to a service can be done in 2 easy steps.
    
            BulkheadRegistry bulkheadRegistry = BulkheadRegistry.of(bulkheadConfig);
            return bulkheadRegistry.bulkhead(DATA_SERVICE);
-       }
+    }
        
 2.  Decorate the service using the Bulkhead created above.
 
