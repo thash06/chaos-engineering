@@ -84,3 +84,9 @@ permittedNumberOfCallsInHalfOpenState() to go through to determine if the status
         CircuitBreakerRegistry circuitBreakerRegistry = CircuitBreakerRegistry.of(circuitBreakerConfig);
         return circuitBreakerRegistry.circuitBreaker(DATA_SERVICE);
     }
+
+# Rate Limiting
+Rate limiting is an imperative technique to prepare your API for scale and establish high availability and reliability of your service.
+
+#Bulkhead
+Used to limit the number of concurrent calls to a service. If clients send more than the number of concurrent calls (referred to as the saturation point and configured using the maxConcurrentCalls()) to the service, Bulkhead decorator arounds the service protects it from getting overwhelmed by keeping the additional calls waiting for a preconfigured time (configured through maxWaitTime()). If during this wait time any of the threads handing the existing concurrent calls becomes available the waiting calls get their turn to execute else these calls are rejected by the Bulkhead decorator by throwing a BulkheadFullException stating that  "Bulkhead <bulkhead-name> is full and does not permit further calls".

@@ -18,6 +18,8 @@ package com.fidelity.fbt.chaos.refapp.service;
 import com.fidelity.fbt.chaos.refapp.model.MockDataServiceResponse;
 import com.fidelity.fbt.chaos.refapp.model.Offering;
 import com.fidelity.fbt.chaos.refapp.repository.ChaosEngineeringDataRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.stereotype.Service;
@@ -35,6 +37,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 @Service
 @Component(value = "chaosEngineeringDataService")
 public class ChaosEngineeringDataServiceImpl implements ChaosEngineeringDataService {
+	private static Logger LOGGER = LoggerFactory.getLogger(ChaosEngineeringDataServiceImpl.class);
 	private static final String SERVICE = "data-service";
 
 	private AtomicInteger atomicInteger = new AtomicInteger(0);
@@ -50,6 +53,7 @@ public class ChaosEngineeringDataServiceImpl implements ChaosEngineeringDataServ
 	 */
 	@Override
 	public MockDataServiceResponse getMockOfferingsDataFromService() {
+		LOGGER.info("Invoking ChaosEngineeringDataServiceImpl count {}", atomicInteger.incrementAndGet());
 		String hostedRegion = "";
 
 //		Region region = Regions.getCurrentRegion();

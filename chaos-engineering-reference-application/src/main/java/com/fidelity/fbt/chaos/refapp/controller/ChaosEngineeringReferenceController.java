@@ -17,6 +17,8 @@ package com.fidelity.fbt.chaos.refapp.controller;
 
 import com.fidelity.fbt.chaos.refapp.model.MockDataServiceResponse;
 import com.fidelity.fbt.chaos.refapp.service.ChaosEngineeringDataService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -30,7 +32,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/data-service")
 public class ChaosEngineeringReferenceController {
 
-
+	private static Logger LOGGER = LoggerFactory.getLogger(ChaosEngineeringReferenceController.class);
 	/**
 	 * Data layer dependency for invoking data layer methods
 	 */

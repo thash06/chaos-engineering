@@ -5,6 +5,8 @@ import com.fidelity.fbt.resiliency.refapp.enums.MarketType;
 import com.fidelity.fbt.resiliency.refapp.enums.ProductType;
 import com.fidelity.fbt.resiliency.refapp.model.MockClientServiceResponse;
 import com.fidelity.fbt.resiliency.refapp.model.Offering;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -22,6 +24,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 @Service
 public class ResiliencyDataServiceImpl implements ResiliencyDataService {
+    private static Logger LOGGER = LoggerFactory.getLogger(ResiliencyDataServiceImpl.class);
     private AtomicInteger atomicInteger = new AtomicInteger(0);
 
     /**

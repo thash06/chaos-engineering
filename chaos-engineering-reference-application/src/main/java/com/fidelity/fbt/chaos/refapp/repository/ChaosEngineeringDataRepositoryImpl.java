@@ -22,6 +22,8 @@ import java.util.List;
 import java.util.Random;
 import java.util.stream.Collectors;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Repository;
 
 import com.fidelity.fbt.chaos.refapp.enums.CouponType;
@@ -39,13 +41,21 @@ import com.fidelity.fbt.chaos.refapp.model.Offering;
 
 @Repository
 public class ChaosEngineeringDataRepositoryImpl implements ChaosEngineeringDataRepository {
-
+	private static Logger LOGGER = LoggerFactory.getLogger(ChaosEngineeringDataRepositoryImpl.class);
 	/**
 	 * This method returns a list of sample data to service layer,mimicking a database call.
 	 */
 	@Override
 	public List<Offering> getSampleDataFromRepository() {
 		// Ideally here we connect to database and fetch offerings data, for this POC, we will return some dummy offerings
+		LOGGER.info("getSampleDataFromRepository going to sleep");
+		try {
+			Thread.sleep(500);
+		}
+		catch (Exception e){
+			e.printStackTrace();
+		}
+		LOGGER.info("getSampleDataFromRepository waking up");
 		return getDummyOfferings();
 	}
 
