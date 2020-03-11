@@ -149,27 +149,7 @@ public class ResiliencyPatternsController {
         int noOfConcurrentReqSent = 20;
         for (int i = 0; i < noOfConcurrentReqSent; i++) {
             new Thread(() -> {
-                try {
-//                    Object returnValue = callService(bulkhead);
-                    Callable<T> callable = () -> (T) resiliencyDataService.getDatafromRemoteServiceForFallbackPattern();
-                    T returnValue = bulkhead.executeCallable(callable);
-                    bulkhead.getEventPublisher()
-                            .onCallPermitted(event -> {
-                                successfulRemoteCalls.add(Thread.currentThread().getName());
-                                //LOGGER.info("Successful remote call {} ", Thread.currentThread().getName());
-                            })
-                            .onCallRejected(event -> {
-                                rejectedRemoteCalls.add(Thread.currentThread().getName());
-                                //LOGGER.error("Rejected remote call {} ", Thread.currentThread().getName());
-                            })
-                            .onCallFinished(event -> LOGGER.debug("Call Finished {} ", event));
-                    LOGGER.debug(Thread.currentThread().getName() + " successful. Return value = " + returnValue.getClass());
-                    returnValues.add(returnValue);
-
-                } catch (Exception e) {
-                    //LOGGER.error(Thread.currentThread().getName() + " threw exception " + e.getMessage());
-                    failedRequests.add(e);
-                }
+                callRemoteService(bulkhead, returnValues, failedRequests, successfulRemoteCalls, rejectedRemoteCalls);
             }, "Remote-Call-" + (i + 1)).start();
             try {
                 Thread.sleep(50);
@@ -187,6 +167,29 @@ public class ResiliencyPatternsController {
             return (T) wrappedException;
         }
         return (T) returnValues.get(returnValues.size() - 1);
+    }
+
+    private <T> void callRemoteService(Bulkhead bulkhead, List<Object> returnValues, List<Exception> failedRequests, Set<String> successfulRemoteCalls, Set<String> rejectedRemoteCalls) {
+        try {
+            Callable<T> callable = () -> (T) resiliencyDataService.getDatafromRemoteServiceForFallbackPattern();
+            T returnValue = bulkhead.executeCallable(callable);
+            bulkhead.getEventPublisher()
+                    .onCallPermitted(event -> {
+                        successfulRemoteCalls.add(Thread.currentThread().getName());
+                        //LOGGER.info("Successful remote call {} ", Thread.currentThread().getName());
+                    })
+                    .onCallRejected(event -> {
+                        rejectedRemoteCalls.add(Thread.currentThread().getName());
+                        //LOGGER.error("Rejected remote call {} ", Thread.currentThread().getName());
+                    })
+                    .onCallFinished(event -> LOGGER.debug("Call Finished {} ", event));
+            LOGGER.debug(Thread.currentThread().getName() + " successful. Return value = " + returnValue.getClass());
+            returnValues.add(returnValue);
+
+        } catch (Exception e) {
+            //LOGGER.error(Thread.currentThread().getName() + " threw exception " + e.getMessage());
+            failedRequests.add(e);
+        }
     }
 
 //    private <T> T executeWithBulkhead(int maxConcurrentCalls, int maxWaitDuration, Supplier<T> supplier, Function<Throwable, T> fallback) {
