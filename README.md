@@ -113,6 +113,8 @@ Applying a Bulkhead decorator to a service can be done in 2 easy steps.
     service that it protected to accept _maxConcurrentCalls_ calls concurrently. While the request is being processed any new incoming request will be 
     queued for _maxWaitDuration_ and if during this time any of the concurrent calls complete and frees up the Thread the waiting request will get 
     forwarded to the service otherwise a BulkheadFullException is thrown.
+    
+    
     private Bulkhead createBulkhead(int maxConcurrentCalls, int maxWaitDuration) {
            BulkheadConfig bulkheadConfig = BulkheadConfig.custom()
                    .maxConcurrentCalls(maxConcurrentCalls)
@@ -122,30 +124,32 @@ Applying a Bulkhead decorator to a service can be done in 2 easy steps.
            BulkheadRegistry bulkheadRegistry = BulkheadRegistry.of(bulkheadConfig);
            return bulkheadRegistry.bulkhead(DATA_SERVICE);
        }
+       
 2.  Decorate the service using the Bulkhead created above.
 
-        private <T> void callRemoteService(Bulkhead bulkhead, List<Object> returnValues, List<Exception> failedRequests, Set<String> successfulRemoteCalls, Set<String> rejectedRemoteCalls) {
-            try {
-                Callable<T> callable = () -> (T) resiliencyDataService.getDatafromRemoteServiceForFallbackPattern();
-                T returnValue = bulkhead.executeCallable(callable);
-                bulkhead.getEventPublisher()
-                        .onCallPermitted(event -> {
-                            successfulRemoteCalls.add(Thread.currentThread().getName());
-                            //LOGGER.info("Successful remote call {} ", Thread.currentThread().getName());
-                        })
-                        .onCallRejected(event -> {
-                            rejectedRemoteCalls.add(Thread.currentThread().getName());
-                            //LOGGER.error("Rejected remote call {} ", Thread.currentThread().getName());
-                        })
-                        .onCallFinished(event -> LOGGER.debug("Call Finished {} ", event));
-                LOGGER.debug(Thread.currentThread().getName() + " successful. Return value = " + returnValue.getClass());
-                returnValues.add(returnValue);
-    
-            } catch (Exception e) {
-                //LOGGER.error(Thread.currentThread().getName() + " threw exception " + e.getMessage());
-                failedRequests.add(e);
-            }
+        
+    private <T> void callRemoteService(Bulkhead bulkhead, List<Object> returnValues, List<Exception> failedRequests, Set<String> successfulRemoteCalls, Set<String> rejectedRemoteCalls) {
+        try {
+            Callable<T> callable = () -> (T) resiliencyDataService.getDatafromRemoteServiceForFallbackPattern();
+            T returnValue = bulkhead.executeCallable(callable);
+            bulkhead.getEventPublisher()
+                    .onCallPermitted(event -> {
+                        successfulRemoteCalls.add(Thread.currentThread().getName());
+                        //LOGGER.info("Successful remote call {} ", Thread.currentThread().getName());
+                    })
+                    .onCallRejected(event -> {
+                        rejectedRemoteCalls.add(Thread.currentThread().getName());
+                        //LOGGER.error("Rejected remote call {} ", Thread.currentThread().getName());
+                    })
+                    .onCallFinished(event -> LOGGER.debug("Call Finished {} ", event));
+            LOGGER.debug(Thread.currentThread().getName() + " successful. Return value = " + returnValue.getClass());
+            returnValues.add(returnValue);
+
+        } catch (Exception e) {
+            //LOGGER.error(Thread.currentThread().getName() + " threw exception " + e.getMessage());
+            failedRequests.add(e);
         }
+    }
 
 
 The eventPublisher retrieved from the bulkhead gives the event details of the successful, rejected and finished events. Using which the user 
