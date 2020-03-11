@@ -1,10 +1,17 @@
-# Chaos-engineering
+###### Chaos-engineering
+This project consists of implementations of a few patterns that allow remote or local services achieve fault tolerance 
+(i.e resiliency) in the face of events such as service failure, too many concurrent requests etc. 
+The frameworks of choice is resilience4j which provides higher-order functions (decorators) to enhance any functional interface,
+lambda expression or method reference with a Circuit Breaker, Rate Limiter, Retry or Bulkhead. We can choose to use one or more
+of these "Decorators" to meet our objective.
 
 # Retry with exponential backoff.
-In the even of failure due to unavailability or any of the Exceptions listed in retryExceptions() menthod listed below, applications can choose to return a fallback/default return value or choose to keep the connection open and retry the endpoint which threw the error.
+In the even of failure due to unavailability or any of the Exceptions listed in retryExceptions() method listed below, 
+applications can choose to return a fallback/default return value or choose to keep the connection open and retry the endpoint which threw the error.
 The retry logic can make use of a feature called exponential backoff. 
 
-The code snippet below creates a retry config which allows a maximum of 5 retries where the first retry will be after 5000 miliseconds and each subsequent retry will be a multiple(2 in this case) of the previous. 
+The code snippet below creates a retry config which allows a maximum of 5 retries where the first retry will be after 
+5000 milliseconds and each subsequent retry will be a multiple(2 in this case) of the previous. 
 
     private <T> T executeWithRetry(Supplier<T> supplier, Function<Throwable, T> fallback) {
         Retry retry = Retry.of(DATA_SERVICE, this::createRetryConfig);
@@ -22,11 +29,11 @@ The code snippet below creates a retry config which allows a maximum of 5 retrie
                 .retryExceptions(ConnectException.class, ResourceAccessException.class)
                 .build();
     }
- The example above could very well be tuned to return a default cached/default reponse rather than retry with a single line code change.
+ The example above could very well be tuned to return a default cached/default response rather than retry with a single 
+ line code change.
  
     private <T> T executeWithRetry(Supplier<T> supplier, Function<Throwable, T> fallback) {
         retry = Retry.of(DATA_SERVICE, this::createRetryConfig);
-        // Create a RetryRegistry with a custom global configuration
         retryRegistry = RetryRegistry.of(createRetryConfig());
         return Decorators.ofSupplier(supplier)
                 .withFallback(Arrays.asList(ConnectException.class, ResourceAccessException.class), fallback)
@@ -34,15 +41,17 @@ The code snippet below creates a retry config which allows a maximum of 5 retrie
     }
     
 # CircuitBreaker
-In cases where default value is not an option and the remote system does not "heal" or respond even after repeated retries we can prevent furthur calls to the downstream system. The Circuit Breaker is one such method which helps us in preventing a cascade of failures when a remote service is down.
+In cases where default value is not an option and the remote system does not "heal" or respond even after repeated retries 
+we can prevent further calls to the downstream system. The Circuit Breaker is one such method which helps us in preventing a 
+cascade of failures when a remote service is down.
 CircuitBreaker has 3 states
-OPEN -  Rejects calls to remote service with a CallNotPermittedException when it is OPEN.
-HALF_OPEN - Permits a configurable number of calls to see if the backend is still unavailable or has become available again.
-CLOSED - Calls can be made to the remote system. This happens when the failure rate and slow call rate is below the threshold.
+**OPEN** -  Rejects calls to remote service with a CallNotPermittedException when it is OPEN.
+**HALF_OPEN** - Permits a configurable number of calls to see if the backend is still unavailable or has become available again.
+**CLOSED** - Calls can be made to the remote system. This happens when the failure rate and slow call rate is below the threshold.
 
 Two other states are also supported
-DISABLED - always allow access.
-FORCED_OPEN - always deny access
+**DISABLED** - always allow access.
+**FORCED_OPEN** - always deny access
 
 The transition happens from CLOSED to OPEN state when based upon 
 1. How many of the last N calls have failed(Count based sliding window) or  
@@ -57,7 +66,8 @@ A few settings can be configured for a Circuit Breaker:
 4. A Predicate which evaluates if an exception should count as a failure.
 
 
-The code snippet below configures the CircuitBreaker and registers it against a global name and then attaches it to the method supplier. 
+The code snippet below configures the CircuitBreaker and registers it against a global name and then attaches it to the 
+method supplier. 
 A few important settings are discussed below and the rest are self explanatory.
 The failureRateThreshold value specifies what percentage of remote calls should fail for the state to change from CLOSED to OPEN. 
 The slidingWindowSize() property specifies the number of calls which will be used to determine the failure threshold percentage.
@@ -86,7 +96,8 @@ permittedNumberOfCallsInHalfOpenState() to go through to determine if the status
     }
 
 # Rate Limiting
-Rate limiting is an imperative technique to prepare your API for scale and establish high availability and reliability of your service.
+Rate limiting is an imperative technique to prepare your API for scale and establish high availability and reliability of 
+your service.
 
 # Bulkhead
 Used to limit the number of concurrent calls to a service. If clients send more than the number of concurrent calls 
