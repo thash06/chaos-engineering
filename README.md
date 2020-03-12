@@ -52,7 +52,7 @@ Two other states are also supported
 - **DISABLED** - always allow access.
 - **FORCED_OPEN** - always deny access
 
-The transition happens from CLOSED to OPEN state when based upon 
+The transition happens from CLOSED to OPEN state based upon 
 1. How many of the last N calls have failed(Count based sliding window) or  
 2. How many failures did we have in the last N minutes(or any other duration) called Time based sliding window.
 
@@ -75,10 +75,16 @@ CircuitBreaker status changes to OPEN.
 It stays in Open state for waitDurationInOpenState() milliseconds then then allows the number  specified in
 permittedNumberOfCallsInHalfOpenState() to go through to determine if the status can go back to CLOSED or stay in OPEN.
 
-    private <T> T executeWithRetryAndCircuitBreaker(Supplier<T> supplier, Function<Throwable, T> fallback) {
-        return Decorators.ofSupplier(supplier)
+    private <T> T executeWithCircuitBreaker(Supplier<T> supplier){
+        Supplier<T> decoratedSupplier = Decorators.ofSupplier(supplier)
                 .withCircuitBreaker(circuitBreaker)
-                .get();
+                .decorate();
+        handlePublisherEvents();
+
+        return Try.ofSupplier(decoratedSupplier).getOrElseGet(throwable -> {
+            String response = "{CircuitBreaker State is : " + circuitBreaker.getState().name() + ", \n Returning cached response: " + fallback() + "}";
+            return (T) response;
+        });
     }
 
     private CircuitBreaker createCircuitBreaker() {
