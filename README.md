@@ -1,11 +1,11 @@
-###### Chaos-engineering
+# Chaos-engineering
 This project consists of implementations of a few patterns that allow remote or local services achieve fault tolerance 
 (i.e resiliency) in the face of events such as service failure, too many concurrent requests etc. 
 The frameworks of choice is resilience4j which provides higher-order functions (decorators) to enhance any functional interface,
 lambda expression or method reference with a Circuit Breaker, Rate Limiter, Retry or Bulkhead. We can choose to use one or more
 of these "Decorators" to meet our objective.
 
-# Retry with exponential backoff.
+## Retry with exponential backoff.
 In the even of failure due to unavailability or any of the Exceptions listed in retryExceptions() method listed below, 
 applications can choose to return a fallback/default return value or choose to keep the connection open and retry the endpoint which threw the error.
 The retry logic can make use of a feature called exponential backoff. 
@@ -39,7 +39,7 @@ The code snippet below creates a retry config which allows a maximum of 5 retrie
                 .get();
     }
     
-# CircuitBreaker
+## CircuitBreaker
 In cases where default value is not an option and the remote system does not "heal" or respond even after repeated retries 
 we can prevent further calls to the downstream system. The Circuit Breaker is one such method which helps us in preventing a 
 cascade of failures when a remote service is down.
@@ -94,11 +94,11 @@ permittedNumberOfCallsInHalfOpenState() to go through to determine if the status
         return circuitBreakerRegistry.circuitBreaker(DATA_SERVICE);
     }
 
-# Rate Limiting
+## Rate Limiting
 Rate limiting is an imperative technique to prepare your API for scale and establish high availability and reliability of 
 your service.
 
-# Bulkhead
+## Bulkhead
 Used to limit the number of concurrent calls to a service. If clients send more than the number of concurrent calls 
 (**referred to as the saturation point and configured using the maxConcurrentCalls()**) than the service is configured to handle, 
 a Bulkhead decorated service protects it from getting overwhelmed by keeping the additional calls waiting for a preconfigured time 
@@ -115,44 +115,68 @@ Applying a Bulkhead decorator to a service can be done in 2 easy steps.
 
 
 ```
-	private Bulkhead createBulkhead(int maxConcurrentCalls, int maxWaitDuration) {
-               BulkheadConfig bulkheadConfig = BulkheadConfig.custom()
-                       .maxConcurrentCalls(maxConcurrentCalls)
-                       .maxWaitDuration(Duration.ofMillis(maxWaitDuration))
-                       .build();
-               BulkheadRegistry bulkheadRegistry = BulkheadRegistry.of(bulkheadConfig);
-               return bulkheadRegistry.bulkhead(DATA_SERVICE);
-        }
+    private Bulkhead createBulkhead(int maxConcurrentCalls, int maxWaitDuration) {
+        BulkheadConfig bulkheadConfig = BulkheadConfig.custom()
+                .maxConcurrentCalls(maxConcurrentCalls)
+                .maxWaitDuration(Duration.ofMillis(maxWaitDuration))
+                .build();
+
+        BulkheadRegistry bulkheadRegistry = BulkheadRegistry.of(bulkheadConfig);
+        return bulkheadRegistry.bulkhead(DATA_SERVICE);
+    }
 ```
 
 2.  Decorate the service using the Bulkhead created above.
 
 ```
-    private <T> void callRemoteService(Bulkhead bulkhead, List<Object> returnValues, List<Exception> failedRequests, Set<String> successfulRemoteCalls, Set<String> rejectedRemoteCalls) {
-        try {
+    private <T> T callRemoteService(Bulkhead bulkhead) throws Exception{
             Callable<T> callable = () -> (T) resiliencyDataService.getDatafromRemoteServiceForFallbackPattern();
-            T returnValue = bulkhead.executeCallable(callable);
-            bulkhead.getEventPublisher()
-                    .onCallPermitted(event -> {
-                        successfulRemoteCalls.add(Thread.currentThread().getName());
-                        //LOGGER.info("Successful remote call {} ", Thread.currentThread().getName());
-                    })
-                    .onCallRejected(event -> {
-                        rejectedRemoteCalls.add(Thread.currentThread().getName());
-                        //LOGGER.error("Rejected remote call {} ", Thread.currentThread().getName());
-                    })
-                    .onCallFinished(event -> LOGGER.debug("Call Finished {} ", event));
-            LOGGER.debug(Thread.currentThread().getName() + " successful. Return value = " + returnValue.getClass());
-            returnValues.add(returnValue);
-
-        } catch (Exception e) {
-            //LOGGER.error(Thread.currentThread().getName() + " threw exception " + e.getMessage());
-            failedRequests.add(e);
-        }
+            Callable<T> decoratedCallable = Decorators.ofCallable(callable)
+                    .withBulkhead(bulkhead)
+                    .decorate();
+        handlePublisherEvents(bulkhead);
+        return Try.ofCallable(decoratedCallable).getOrElseThrow(() ->
+                    new Exception("{Bulkhead full : " + bulkhead.getName() + ". Could return a cached response here}")
+            );
     }
 ```
 
 
 The eventPublisher retrieved from the bulkhead gives the event details of the successful, rejected and finished events. Using which the user 
 could determine how best to handle each of these events.
+
+A small test stub that simulates sending 20 concurrent requests is shown below.
+ ```
+    private <T> T executeWithBulkhead(Bulkhead bulkhead) {
+        LOGGER.info("Created Bulkhead with {} max concurrent calls maxWaitDuration {} ",
+                bulkhead.getBulkheadConfig().getMaxConcurrentCalls(), bulkhead.getBulkheadConfig().getMaxWaitDuration());
+        List<Object> returnValues = new ArrayList<>();
+        Set<String> rejectedRemoteCalls = new HashSet<>();
+        int noOfConcurrentReqSent = 20;
+        for (int i = 0; i < noOfConcurrentReqSent; i++) {
+            new Thread(() -> {
+                try {
+                    T returnValue = callRemoteService(bulkhead);
+                    returnValues.add(returnValue);
+                } catch (Exception e) {
+                    rejectedRemoteCalls.add(Thread.currentThread().getName() + " due to " + e.getMessage());
+                }
+            }, "Remote-Call-" + (i + 1)).start();
+            try {
+                Thread.sleep(50);
+            } catch (InterruptedException e) {
+                LOGGER.error(Thread.currentThread().getName() + " threw InterruptedException " + e.getMessage());
+            }
+        }
+        LOGGER.info("Number of successful requests {} number of rejected requests {}", returnValues.size(), rejectedRemoteCalls.size());
+
+        if (!rejectedRemoteCalls.isEmpty()) {
+            String message = "Following calls failed: " + rejectedRemoteCalls.stream().reduce((s, s2) -> String.join("\n ", s, s2)).get();
+            Exception wrappedException = new Exception(message);
+            return (T) wrappedException;
+        }
+        return (T) returnValues.get(returnValues.size() - 1);
+    }
+```
+ 
  
