@@ -47,6 +47,7 @@ public class ResiliencyDataServiceImpl implements ResiliencyDataService {
 
     //@HystrixCommand(fallbackMethod ="fallbackOnFailure")
     public Object getDatafromRemoteServiceForFallbackPattern() {
+        LOGGER.info(" Call got past decorator and now invoking Remote Endpoint");
         Object responseEntity = this.restTemplate.getForObject(remoteServerUrl, Object.class);
         return responseEntity;
     }

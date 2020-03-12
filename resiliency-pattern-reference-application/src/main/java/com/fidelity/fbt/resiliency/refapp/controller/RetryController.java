@@ -54,7 +54,7 @@ public class RetryController {
      * @return This endpoint returns mock response for demonstrating fallback resiliency pattern
      */
     @GetMapping("/retry")
-    public Object getMockOfferings() {
+    public Object getMockOfferings(int maxSize) {
         LOGGER.info("Invoking RetryController count {} ", atomicInteger.incrementAndGet());
         return executeWithRetry(resiliencyDataService::getDatafromRemoteServiceForFallbackPattern, this::fallback);
     }

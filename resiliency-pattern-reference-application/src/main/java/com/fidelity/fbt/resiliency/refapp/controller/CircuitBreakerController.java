@@ -23,6 +23,8 @@ import org.springframework.web.client.ResourceAccessException;
 
 import java.net.ConnectException;
 import java.time.Duration;
+import java.util.*;
+import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -42,7 +44,6 @@ public class CircuitBreakerController {
      */
     private final ResiliencyDataService resiliencyDataService;
     private CircuitBreaker circuitBreaker;
-    private Retry retry;
 
 
     public CircuitBreakerController(
@@ -50,7 +51,6 @@ public class CircuitBreakerController {
             ThreadPoolBulkheadRegistry threadPoolBulkheadRegistry,
             RateLimiterRegistry rateLimiterRegistry,
             TimeLimiterRegistry timeLimiterRegistry) {
-        //this.chaosEngineeringDataService = chaosEngineeringDataService;
         this.resiliencyDataService = resiliencyDataService;
         this.circuitBreaker = createCircuitBreaker();
 
@@ -63,7 +63,7 @@ public class CircuitBreakerController {
     @GetMapping("/circuit-breaker")
     public Object getMockOfferings() {
         LOGGER.info("Invoking CircuitBreakerController {}", atomicInteger.incrementAndGet());
-        return executeWithRetryAndCircuitBreaker(resiliencyDataService::getDatafromRemoteServiceForFallbackPattern, this::fallback);
+        return executeWithRetryAndCircuitBreaker(resiliencyDataService::getDatafromRemoteServiceForFallbackPattern);
     }
 
 //    private <T> T execute(Supplier<T> supplier, Function<Throwable, T> fallback) {
@@ -78,24 +78,51 @@ public class CircuitBreakerController {
 //    }
 
 
-    private <T> T executeWithRetryAndCircuitBreaker(Supplier<T> supplier, Function<Throwable, T> fallback) {
-        this.retry = Retry.of(DATA_SERVICE, this::createRetryConfig);
-        circuitBreaker.getEventPublisher()
-                .onCallNotPermitted(event -> LOGGER.info(" onCallNotPermitted {}", event))
-                .onError(event -> LOGGER.error(" onError {}", event))
-                .onFailureRateExceeded(event -> LOGGER.info(" onFailureRateExceeded {}", event))
-                .onIgnoredError(event -> LOGGER.info(" onIgnoredError {}", event))
-                .onReset(event -> LOGGER.info(" onReset {}", event))
-                .onStateTransition(event -> LOGGER.info(" onStateTransition {}", event))
-                .onSuccess(event -> LOGGER.info(" onSuccess {}", event));
-        Supplier<T> decoratedSupplier = CircuitBreaker.decorateSupplier(this.circuitBreaker, supplier);
-        return Try.ofSupplier(decoratedSupplier)
-                .onFailure(throwable -> fallback(throwable)).get();
+    private <T> T executeWithRetryAndCircuitBreaker(Supplier<T> supplier){
+        List<Object> returnValues = new ArrayList<>();
+        Set<String> successfulRemoteCalls = new HashSet<>();
+        Set<String> rejectedRemoteCalls = new HashSet<>();
 
+//        Supplier<T> decoratedSupplier = CircuitBreaker.decorateSupplier(this.circuitBreaker, supplier);
+//        return Try.ofSupplier(decoratedSupplier)
+//                .recover(throwable -> (T) fallback(throwable)).get();
+        if (!rejectedRemoteCalls.isEmpty()) {
+            String message = "CircuitBreaker state is: " + rejectedRemoteCalls.stream().reduce((s, s2) -> String.join(", ", s, s2)).get();
+            Exception wrappedException = new Exception(message);
+            return (T) wrappedException;
+        }
 //        return Decorators.ofSupplier(supplier)
 //                .withCircuitBreaker(this.circuitBreaker)
-//                .withRetry(retry)
 //                .get();
+        Supplier<T> decoratedSupplier = Decorators.ofSupplier(supplier)
+                .withFallback(Arrays.asList(ConnectException.class), throwable -> (T) fallback(throwable))
+                .withCircuitBreaker(circuitBreaker)
+                .decorate();
+        circuitBreaker.getEventPublisher()
+                .onCallNotPermitted(event -> LOGGER.debug(" onCallNotPermitted {}", event))
+                .onError(event -> LOGGER.debug(" onError {}", event))
+                .onFailureRateExceeded(event -> LOGGER.debug(" onFailureRateExceeded {}", event))
+                .onIgnoredError(event -> LOGGER.debug(" onIgnoredError {}", event))
+                .onReset(event -> LOGGER.info(" onReset {}", event))
+                .onStateTransition(event -> {
+                    if(event.getStateTransition() == CircuitBreaker.StateTransition.OPEN_TO_HALF_OPEN) {
+                        LOGGER.debug(" onStateTransition OPEN_TO_HALF_OPEN {}", event.getStateTransition());
+                        rejectedRemoteCalls.add(event.getStateTransition().toString());
+                    }
+                    else if(event.getStateTransition() == CircuitBreaker.StateTransition.HALF_OPEN_TO_CLOSED){
+                        LOGGER.debug(" onStateTransition HALF_OPEN_TO_CLOSED {}", event.getStateTransition());
+                        rejectedRemoteCalls.add(event.getStateTransition().toString());
+                    }
+                    else{
+                        rejectedRemoteCalls.add(event.getStateTransition().toString());
+                        LOGGER.debug(" onStateTransition {}", event.getStateTransition());
+                    }
+
+                })
+                .onSuccess(event -> LOGGER.debug(" onSuccess {}", event))
+        ;
+
+        return Try.ofSupplier(decoratedSupplier).getOrElseGet(throwable -> (T) circuitBreaker.getState().name());
     }
 
     private CircuitBreaker createCircuitBreaker() {
@@ -111,15 +138,15 @@ public class CircuitBreakerController {
         return circuitBreakerRegistry.circuitBreaker(DATA_SERVICE);
     }
 
-    private RetryConfig createRetryConfig() {
-        IntervalFunction intervalWithCustomExponentialBackoff = IntervalFunction
-                .ofExponentialBackoff(500l, 2d);
-        return RetryConfig.custom()
-                .intervalFunction(intervalWithCustomExponentialBackoff)
-                .maxAttempts(4)
-                .retryExceptions(ConnectException.class, ResourceAccessException.class)
-                .build();
-    }
+//    private RetryConfig createRetryConfig() {
+//        IntervalFunction intervalWithCustomExponentialBackoff = IntervalFunction
+//                .ofExponentialBackoff(500l, 2d);
+//        return RetryConfig.custom()
+//                .intervalFunction(intervalWithCustomExponentialBackoff)
+//                .maxAttempts(4)
+//                .retryExceptions(ConnectException.class, ResourceAccessException.class)
+//                .build();
+//    }
 
     private MockClientServiceResponse fallback(Throwable ex) {
         return resiliencyDataService.fallbackOnFailure();
