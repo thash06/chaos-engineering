@@ -15,9 +15,11 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.net.ConnectException;
 import java.time.Duration;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -36,11 +38,8 @@ public class BulkheadController {
      */
     private final ResiliencyDataService resiliencyDataService;
     private Bulkhead bulkhead;
-    private Retry retry;
 
-    public BulkheadController(
-            ResiliencyDataService resiliencyDataService) {
-        //this.chaosEngineeringDataService = chaosEngineeringDataService;
+    public BulkheadController(ResiliencyDataService resiliencyDataService) {
         this.resiliencyDataService = resiliencyDataService;
     }
 
@@ -50,7 +49,7 @@ public class BulkheadController {
      */
     @GetMapping("/bulkhead")
     public Object getMockOfferings(@RequestParam int maxConcurrentCalls, @RequestParam int maxWaitDuration) {
-        LOGGER.info("Invoking ResiliencyPatternsController count {} ", atomicInteger.incrementAndGet());
+        LOGGER.info("Invoking BulkheadController count {} ", atomicInteger.incrementAndGet());
         //return executeWithBulkhead(maxConcurrentCalls, resiliencyDataService::getDatafromRemoteServiceForFallbackPattern, this::fallback);
         return executeWithBulkhead(createBulkhead(maxConcurrentCalls, maxWaitDuration));
 
@@ -61,12 +60,16 @@ public class BulkheadController {
         LOGGER.info("Created Bulkhead with {} max concurrent calls maxWaitDuration {} ",
                 bulkhead.getBulkheadConfig().getMaxConcurrentCalls(), bulkhead.getBulkheadConfig().getMaxWaitDuration());
         List<Object> returnValues = new ArrayList<>();
-        Set<String> successfulRemoteCalls = new HashSet<>();
         Set<String> rejectedRemoteCalls = new HashSet<>();
         int noOfConcurrentReqSent = 20;
         for (int i = 0; i < noOfConcurrentReqSent; i++) {
             new Thread(() -> {
-                callRemoteService(bulkhead, returnValues, successfulRemoteCalls, rejectedRemoteCalls);
+                try {
+                    T returnValue = callRemoteService(bulkhead);
+                    returnValues.add(returnValue);
+                } catch (Exception e) {
+                    rejectedRemoteCalls.add(Thread.currentThread().getName() + " due to " + e.getMessage());
+                }
             }, "Remote-Call-" + (i + 1)).start();
             try {
                 Thread.sleep(50);
@@ -74,44 +77,32 @@ public class BulkheadController {
                 LOGGER.error(Thread.currentThread().getName() + " threw InterruptedException " + e.getMessage());
             }
         }
-        LOGGER.info("Number of successful requests {} number of rejected requests {}", successfulRemoteCalls, rejectedRemoteCalls);
+        LOGGER.info("Number of successful requests {} number of rejected requests {}", returnValues.size(), rejectedRemoteCalls.size());
 
         if (!rejectedRemoteCalls.isEmpty()) {
-            String message = "Following calls failed: " + rejectedRemoteCalls.stream().reduce((s, s2) -> String.join(", ", s, s2)).get();
-            //String message = e.getMessage() + ". No. of concurrent requests sent " + noOfConcurrentReqSent + " Successful:  " + returnValues.size();
+            String message = "Following calls failed: " + rejectedRemoteCalls.stream().reduce((s, s2) -> String.join("\n ", s, s2)).get();
             Exception wrappedException = new Exception(message);
             return (T) wrappedException;
         }
         return (T) returnValues.get(returnValues.size() - 1);
     }
 
-    private <T> void callRemoteService(Bulkhead bulkhead, List<Object> returnValues, Set<String> successfulRemoteCalls, Set<String> rejectedRemoteCalls) {
-        try {
+    private <T> T callRemoteService(Bulkhead bulkhead) throws Exception{
             Callable<T> callable = () -> (T) resiliencyDataService.getDatafromRemoteServiceForFallbackPattern();
             Callable<T> decoratedCallable = Decorators.ofCallable(callable)
-                    .withFallback(Arrays.asList(ConnectException.class), throwable -> (T) fallback(throwable))
                     .withBulkhead(bulkhead)
                     .decorate();
+        handlePublisherEvents(bulkhead);
+        return Try.ofCallable(decoratedCallable).getOrElseThrow(() ->
+                    new Exception("{Bulkhead full : " + bulkhead.getName() + ". Could return a cached response here}")
+            );
+    }
 
-            Try.ofCallable(decoratedCallable)
-                    .onFailure(throwable -> rejectedRemoteCalls.add(throwable.toString()))
-                    .onSuccess(t -> returnValues.add(t));
-//            T returnValue = bulkhead.executeCallable(decoratedCallable);
-            bulkhead.getEventPublisher()
-                    .onCallPermitted(event -> {
-                        successfulRemoteCalls.add(Thread.currentThread().getName());
-                        LOGGER.debug("Successful remote call {} ", Thread.currentThread().getName());
-                    })
-                    .onCallRejected(event -> {
-                        rejectedRemoteCalls.add(Thread.currentThread().getName());
-                        LOGGER.error("Rejected remote call {} ", Thread.currentThread().getName());
-                    })
-                    .onCallFinished(event -> {
-                        LOGGER.debug("Call Finished {} ", event);
-                    });
-        } catch (Exception e) {
-            LOGGER.error(Thread.currentThread().getName() + " threw exception " + e.getMessage());
-        }
+    private void handlePublisherEvents(Bulkhead bulkhead) {
+        bulkhead.getEventPublisher()
+                .onCallPermitted(event -> LOGGER.debug("Successful remote call {} ", Thread.currentThread().getName()))
+                .onCallRejected(event -> LOGGER.debug("Rejected remote call {} ", Thread.currentThread().getName()))
+                .onCallFinished(event -> LOGGER.debug("Call Finished {} ", event));
     }
 
     // If bulkhead has space available, entry is guaranteed and immediate else maxWaitDuration
@@ -126,7 +117,7 @@ public class BulkheadController {
         return bulkheadRegistry.bulkhead(DATA_SERVICE);
     }
 
-    private MockClientServiceResponse fallback(Throwable ex) {
+    private MockClientServiceResponse fallback() {
         return resiliencyDataService.fallbackOnFailure();
     }
 //    private <T> T execute(Supplier<T> supplier, Function<Throwable, T> fallback) {
