@@ -63,8 +63,8 @@ public class CacheController {
     private <T> void handlePublishedEvents(Cache<Object, Object> cache) {
         cache.getEventPublisher()
                 .onError(event -> LOGGER.error("onError event {} ", event))
-                .onCacheHit(event -> LOGGER.error("onCacheHit event {} ", event))
-                .onCacheMiss(event -> LOGGER.info("onCacheMiss event {} ", event));
+                .onCacheHit(event -> LOGGER.info("onCacheHit event {} ", event))
+                .onCacheMiss(event -> LOGGER.warn("onCacheMiss event {} ", event));
     }
 
     private Cache<Object, Object> createCache() {

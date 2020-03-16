@@ -20,3 +20,6 @@ http://localhost:9000/resiliency-pattern/rate-limiter?limitForPeriod=5&windowInS
 
 ##Bulkhead
 http://localhost:9000/resiliency-pattern/bulkhead?maxConcurrentCalls=4&maxWaitDuration=100
+
+##Cache
+http://localhost:9000/resiliency-pattern/cache?offerId=1001
