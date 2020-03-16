@@ -22,10 +22,6 @@ import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicInteger;
 
-/**
- * @author souadhik
- * Controller class for resilient client application
- */
 @RestController
 @RequestMapping("resiliency-pattern")
 public class BulkheadController {
@@ -86,15 +82,15 @@ public class BulkheadController {
         return (T) returnValues.get(returnValues.size() - 1);
     }
 
-    private <T> T callRemoteService(Bulkhead bulkhead) throws Exception{
-            Callable<T> callable = () -> (T) resiliencyDataService.getDatafromRemoteService();
-            Callable<T> decoratedCallable = Decorators.ofCallable(callable)
-                    .withBulkhead(bulkhead)
-                    .decorate();
+    private <T> T callRemoteService(Bulkhead bulkhead) throws Exception {
+        Callable<T> callable = () -> (T) resiliencyDataService.getDatafromRemoteService();
+        Callable<T> decoratedCallable = Decorators.ofCallable(callable)
+                .withBulkhead(bulkhead)
+                .decorate();
         handlePublisherEvents(bulkhead);
         return Try.ofCallable(decoratedCallable).getOrElseThrow(() ->
-                    new Exception("{Bulkhead full : " + bulkhead.getName() + ". Could return a cached response here}")
-            );
+                new Exception("{Bulkhead full : " + bulkhead.getName() + ". Could return a cached response here}")
+        );
     }
 
     private void handlePublisherEvents(Bulkhead bulkhead) {

@@ -20,10 +20,6 @@ import java.time.Duration;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 
-/**
- * @author souadhik
- * Controller class for resilient client application
- */
 @RestController
 @RequestMapping("resiliency-pattern")
 public class CircuitBreakerController {
@@ -65,7 +61,7 @@ public class CircuitBreakerController {
 //    }
 
 
-    private <T> T executeWithCircuitBreaker(Supplier<T> supplier){
+    private <T> T executeWithCircuitBreaker(Supplier<T> supplier) {
         Supplier<T> decoratedSupplier = Decorators.ofSupplier(supplier)
                 .withCircuitBreaker(circuitBreaker)
                 .decorate();
@@ -85,13 +81,11 @@ public class CircuitBreakerController {
                 .onIgnoredError(event -> LOGGER.debug(" onIgnoredError {}", event))
                 .onReset(event -> LOGGER.info(" onReset {}", event))
                 .onStateTransition(event -> {
-                    if(event.getStateTransition() == CircuitBreaker.StateTransition.OPEN_TO_HALF_OPEN) {
+                    if (event.getStateTransition() == CircuitBreaker.StateTransition.OPEN_TO_HALF_OPEN) {
                         LOGGER.debug(" onStateTransition OPEN_TO_HALF_OPEN {}", event.getStateTransition());
-                    }
-                    else if(event.getStateTransition() == CircuitBreaker.StateTransition.HALF_OPEN_TO_CLOSED){
+                    } else if (event.getStateTransition() == CircuitBreaker.StateTransition.HALF_OPEN_TO_CLOSED) {
                         LOGGER.debug(" onStateTransition HALF_OPEN_TO_CLOSED {}", event.getStateTransition());
-                    }
-                    else{
+                    } else {
                         LOGGER.debug(" onStateTransition something else {}", event.getStateTransition());
                     }
 

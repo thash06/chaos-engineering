@@ -14,17 +14,13 @@ import javax.cache.Caching;
 import javax.cache.configuration.MutableConfiguration;
 import java.util.function.Function;
 
-/**
- * @author souadhik
- * Controller class for resilient client application
- */
 @RestController
 @RequestMapping("resiliency-pattern")
 public class CacheController {
     private static Logger LOGGER = LoggerFactory.getLogger(CacheController.class);
     private static final String DATA_SERVICE = "data-service";
     private CacheManager cacheManager;
-    private final Cache<Object,Object> cache;
+    private final Cache<Object, Object> cache;
     /**
      * Data layer dependency for invoking data methods
      */
@@ -35,6 +31,7 @@ public class CacheController {
         this.resiliencyDataService = resiliencyDataService;
         this.cache = createCache();
     }
+
     /**
      * @return This endpoint returns mock response for demonstrating fallback resiliency pattern
      */

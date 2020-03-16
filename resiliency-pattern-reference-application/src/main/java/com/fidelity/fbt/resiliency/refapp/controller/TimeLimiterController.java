@@ -25,10 +25,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 
-/**
- * @author souadhik
- * Controller class for resilient client application
- */
 @RestController
 @RequestMapping("resiliency-pattern")
 public class TimeLimiterController {
@@ -48,6 +44,7 @@ public class TimeLimiterController {
         this.resiliencyDataService = resiliencyDataService;
         this.circuitBreaker = createCircuitBreaker();
     }
+
     private CircuitBreaker createCircuitBreaker() {
         CircuitBreakerConfig circuitBreakerConfig = CircuitBreakerConfig.custom()
                 .failureRateThreshold(25)
@@ -107,6 +104,7 @@ public class TimeLimiterController {
                 .onTimeout(event -> LOGGER.error("Request timed out {} ", event))
                 .onSuccess(event -> LOGGER.info("Successful request {} ", event));
     }
+
     private void handlePublishedEvents(CircuitBreaker circuitBreaker) {
         circuitBreaker.getEventPublisher()
                 .onCallNotPermitted(event -> LOGGER.info(" onCallNotPermitted {}", event))
@@ -115,13 +113,11 @@ public class TimeLimiterController {
                 .onIgnoredError(event -> LOGGER.debug(" onIgnoredError {}", event))
                 .onReset(event -> LOGGER.info(" onReset {}", event))
                 .onStateTransition(event -> {
-                    if(event.getStateTransition() == CircuitBreaker.StateTransition.CLOSED_TO_OPEN) {
+                    if (event.getStateTransition() == CircuitBreaker.StateTransition.CLOSED_TO_OPEN) {
                         LOGGER.info(" onStateTransition CLOSED_TO_OPEN {}", event.getStateTransition());
-                    }
-                    else if(event.getStateTransition() == CircuitBreaker.StateTransition.OPEN_TO_HALF_OPEN){
+                    } else if (event.getStateTransition() == CircuitBreaker.StateTransition.OPEN_TO_HALF_OPEN) {
                         LOGGER.debug(" onStateTransition OPEN_TO_HALF_OPEN {}", event.getStateTransition());
-                    }
-                    else{
+                    } else {
                         LOGGER.debug(" onStateTransition something else {}", event.getStateTransition());
                     }
 

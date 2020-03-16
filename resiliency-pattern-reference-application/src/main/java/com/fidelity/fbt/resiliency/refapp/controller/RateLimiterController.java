@@ -20,10 +20,6 @@ import java.util.*;
 import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicInteger;
 
-/**
- * @author souadhik
- * Controller class for resilient client application
- */
 @RestController
 @RequestMapping("resiliency-pattern")
 public class RateLimiterController {
@@ -60,7 +56,7 @@ public class RateLimiterController {
         Set<String> successfulRemoteCalls = new HashSet<>();
         Set<String> rejectedRemoteCalls = new HashSet<>();
         for (int i = 0; i < numOfTestRequests; i++) {
-                callRemoteService(rateLimiter, returnValues, successfulRemoteCalls, rejectedRemoteCalls);
+            callRemoteService(rateLimiter, returnValues, successfulRemoteCalls, rejectedRemoteCalls);
         }
         LOGGER.info("Number of successful requests {} number of rejected requests {}", successfulRemoteCalls, rejectedRemoteCalls);
 
