@@ -53,52 +53,38 @@ management.metrics.distribution.percentiles-histogram.resilience4j.circuitbreake
 resilience4j.circuitbreaker:
   configs:
     default:
+      failureRateThreshold: 25
+      waitDurationInOpenState: 10000
+      permittedNumberOfCallsInHalfOpenState: 2
+      slidingWindowSize: 4
       registerHealthIndicator: true
-      slidingWindowSize: 10
       minimumNumberOfCalls: 5
-      permittedNumberOfCallsInHalfOpenState: 3
       automaticTransitionFromOpenToHalfOpenEnabled: true
-      waitDurationInOpenState: 5s
-      failureRateThreshold: 50
       eventConsumerBufferSize: 10
       recordExceptions:
-        - org.springframework.web.client.HttpServerErrorException
-        - java.util.concurrent.TimeoutException
-        - java.io.IOException
-      ignoreExceptions:
-        - com.fidelity.fbt.resiliency.refapp.exception.ChaosEngineeringException
-    shared:
-      slidingWindowSize: 100
-      permittedNumberOfCallsInHalfOpenState: 30
-      waitDurationInOpenState: 1s
-      failureRateThreshold: 50
-      eventConsumerBufferSize: 10
-      ignoreExceptions:
-        - com.fidelity.fbt.resiliency.refapp.exception.ChaosEngineeringException
-  instances:
-    data-service:
-      registerHealthIndicator: true
-      slidingWindowSize: 10
-      minimumNumberOfCalls: 10
-      permittedNumberOfCallsInHalfOpenState: 3
-      waitDurationInOpenState: 5s
-      failureRateThreshold: 50
-      eventConsumerBufferSize: 10
-      #recordFailurePredicate: io.github.robwin.exception.RecordFailurePredicate
-resilience4j.retry:
-  configs:
-    default:
-      maxRetryAttempts: 3
-      waitDuration: 100
-      retryExceptions:
-        - org.springframework.web.client.HttpServerErrorException
-        - java.util.concurrent.TimeoutException
-        - java.io.IOException
+        - java.net.ConnectException
+        - org.springframework.web.client.ResourceAccessException
       ignoreExceptions:
         - com.fidelity.fbt.resiliency.refapp.exception.ChaosEngineeringException
   instances:
     data-service:
       baseConfig: default
+      #recordFailurePredicate: io.github.robwin.exception.RecordFailurePredicate
+
+resilience4j.retry:
+  configs:
+    default:
+      waitDuration: 1000
+      maxRetryAttempts: 10
+      retryExceptions:
+        - java.net.ConnectException
+        - org.springframework.web.client.ResourceAccessException
+      ignoreExceptions:
+        - com.fidelity.fbt.resiliency.refapp.exception.ChaosEngineeringException
+  instances:
+    data-service:
+      baseConfig: default
+
 resilience4j.bulkhead:
   configs:
     default:
@@ -108,17 +94,17 @@ resilience4j.bulkhead:
       maxWaitDuration: 10ms
       maxConcurrentCalls: 20
 
-resilience4j.thread-pool-bulkhead:
-  configs:
-    default:
-      maxThreadPoolSize: 4
-      coreThreadPoolSize: 2
-      queueCapacity: 2
-  instances:
-    data-service:
-      maxThreadPoolSize: 1
-      coreThreadPoolSize: 1
-      queueCapacity: 1
+#resilience4j.thread-pool-bulkhead:
+#  configs:
+#    default:
+#      maxThreadPoolSize: 4
+#      coreThreadPoolSize: 2
+#      queueCapacity: 2
+#  instances:
+#    data-service:
+#      maxThreadPoolSize: 1
+#      coreThreadPoolSize: 1
+#      queueCapacity: 1
 
 resilience4j.ratelimiter:
   configs:

@@ -2,14 +2,11 @@ package com.fidelity.fbt.resiliency.refapp.controller;
 
 import com.fidelity.fbt.resiliency.refapp.model.MockClientServiceResponse;
 import com.fidelity.fbt.resiliency.refapp.service.ResiliencyDataService;
-import io.github.resilience4j.bulkhead.ThreadPoolBulkheadRegistry;
 import io.github.resilience4j.core.IntervalFunction;
 import io.github.resilience4j.decorators.Decorators;
-import io.github.resilience4j.ratelimiter.RateLimiterRegistry;
 import io.github.resilience4j.retry.Retry;
 import io.github.resilience4j.retry.RetryConfig;
 import io.github.resilience4j.retry.RetryRegistry;
-import io.github.resilience4j.timelimiter.TimeLimiterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -35,10 +32,7 @@ public class RetryController {
     private RetryRegistry retryRegistry;
 
     public RetryController(
-            ResiliencyDataService resiliencyDataService,
-            ThreadPoolBulkheadRegistry threadPoolBulkheadRegistry,
-            RateLimiterRegistry rateLimiterRegistry,
-            TimeLimiterRegistry timeLimiterRegistry) {
+            ResiliencyDataService resiliencyDataService) {
         this.resiliencyDataService = resiliencyDataService;
     }
 
