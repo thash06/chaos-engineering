@@ -50,7 +50,7 @@ public class CircuitBreakerController {
     @GetMapping("/circuit-breaker")
     public Object getMockOfferings() {
         LOGGER.info("Invoking CircuitBreakerController {}", atomicInteger.incrementAndGet());
-        return executeWithCircuitBreaker(resiliencyDataService::getDatafromRemoteServiceForFallbackPattern);
+        return executeWithCircuitBreaker(resiliencyDataService::getDatafromRemoteService);
     }
 
 //    private <T> T execute(Supplier<T> supplier, Function<Throwable, T> fallback) {

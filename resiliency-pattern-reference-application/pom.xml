@@ -123,6 +123,11 @@
 			<artifactId>vavr-jackson</artifactId>
 			<version>0.10.0</version>
 		</dependency>
+		<dependency>
+			<groupId>org.ehcache</groupId>
+			<artifactId>ehcache</artifactId>
+			<version>3.8.1</version>
+		</dependency>
 	</dependencies>
 
 	<dependencyManagement>

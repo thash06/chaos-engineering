@@ -19,7 +19,6 @@ import com.fidelity.fbt.chaos.refapp.model.MockDataServiceResponse;
 
 /**
  * @author souadhik
- *
  */
 public interface ChaosEngineeringDataService {
 	/**
@@ -27,4 +26,5 @@ public interface ChaosEngineeringDataService {
 	 */
 	MockDataServiceResponse getMockOfferingsDataFromService();
 
+	MockDataServiceResponse getMockOfferingsDataFromService(String id);
 }

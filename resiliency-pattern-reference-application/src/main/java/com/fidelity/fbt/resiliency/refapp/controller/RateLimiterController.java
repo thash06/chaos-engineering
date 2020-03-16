@@ -2,7 +2,6 @@ package com.fidelity.fbt.resiliency.refapp.controller;
 
 import com.fidelity.fbt.resiliency.refapp.model.MockClientServiceResponse;
 import com.fidelity.fbt.resiliency.refapp.service.ResiliencyDataService;
-import io.github.resilience4j.bulkhead.Bulkhead;
 import io.github.resilience4j.decorators.Decorators;
 import io.github.resilience4j.ratelimiter.RateLimiter;
 import io.github.resilience4j.ratelimiter.RateLimiterConfig;
@@ -76,7 +75,7 @@ public class RateLimiterController {
 
     private <T> void callRemoteService(RateLimiter rateLimiter, List<Object> returnValues, Set<String> successfulRemoteCalls, Set<String> rejectedRemoteCalls) {
         try {
-            Callable<T> callable = () -> (T) resiliencyDataService.getDatafromRemoteServiceForFallbackPattern();
+            Callable<T> callable = () -> (T) resiliencyDataService.getDatafromRemoteService();
             Callable<T> decoratedCallable = Decorators.ofCallable(callable)
                     .withFallback(Arrays.asList(ConnectException.class), throwable -> (T) fallback(throwable))
                     .withRateLimiter(rateLimiter)

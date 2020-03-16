@@ -53,7 +53,7 @@ public class RetryController {
     @GetMapping("/retry")
     public Object getMockOfferings() {
         LOGGER.info("Invoking RetryController count {} ", atomicInteger.incrementAndGet());
-        return executeWithRetry(resiliencyDataService::getDatafromRemoteServiceForFallbackPattern);
+        return executeWithRetry(resiliencyDataService::getDatafromRemoteService);
     }
 
     private <T> T executeWithRetry(Supplier<T> supplier) {

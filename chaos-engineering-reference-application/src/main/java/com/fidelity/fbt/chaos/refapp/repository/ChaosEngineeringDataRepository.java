@@ -15,9 +15,9 @@
  ******************************************************************************/
 package com.fidelity.fbt.chaos.refapp.repository;
 
-import java.util.List;
-
 import com.fidelity.fbt.chaos.refapp.model.Offering;
+
+import java.util.List;
 
 /**
  * @author souadhik
@@ -28,11 +28,11 @@ public interface ChaosEngineeringDataRepository {
 	/**
 	 * @return a list of dummy offering data
 	 */
-	public List<Offering> getSampleDataFromRepository();
-	
+	List<Offering> getSampleDataFromRepository();
+
 	/**
 	 * @param offerId
 	 * @returns a specific dummy offering by id
 	 */
-	public List<Offering> getSampleDataFromRepositoryById(String Id);
+	List<Offering> getSampleDataFromRepositoryById(String offerId);
 }

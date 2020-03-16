@@ -6,7 +6,6 @@ import io.github.resilience4j.bulkhead.Bulkhead;
 import io.github.resilience4j.bulkhead.BulkheadConfig;
 import io.github.resilience4j.bulkhead.BulkheadRegistry;
 import io.github.resilience4j.decorators.Decorators;
-import io.github.resilience4j.retry.Retry;
 import io.vavr.control.Try;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -88,7 +87,7 @@ public class BulkheadController {
     }
 
     private <T> T callRemoteService(Bulkhead bulkhead) throws Exception{
-            Callable<T> callable = () -> (T) resiliencyDataService.getDatafromRemoteServiceForFallbackPattern();
+            Callable<T> callable = () -> (T) resiliencyDataService.getDatafromRemoteService();
             Callable<T> decoratedCallable = Decorators.ofCallable(callable)
                     .withBulkhead(bulkhead)
                     .decorate();

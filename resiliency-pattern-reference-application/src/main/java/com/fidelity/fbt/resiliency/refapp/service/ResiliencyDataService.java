@@ -10,7 +10,9 @@ public interface ResiliencyDataService {
 	/**
 	 * @return This methods returns mock response from the remote data service
 	 */
-	Object getDatafromRemoteServiceForFallbackPattern();
+	Object getDatafromRemoteService();
+
+	Object getDatafromRemoteService(String offerId);
 
 	MockClientServiceResponse fallbackOnFailure();
 

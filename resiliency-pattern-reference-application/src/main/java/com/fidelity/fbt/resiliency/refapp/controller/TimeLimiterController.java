@@ -79,7 +79,7 @@ public class TimeLimiterController {
     private <T> T callRemoteService(TimeLimiter timeLimiter) throws Exception {
         handlePublishedEvents(timeLimiter);
         Supplier<CompletableFuture<Object>> futureSupplier = () ->
-                CompletableFuture.supplyAsync(resiliencyDataService::getDatafromRemoteServiceForFallbackPattern);
+                CompletableFuture.supplyAsync(resiliencyDataService::getDatafromRemoteService);
         Callable<Object> decorateFutureSupplier = TimeLimiter.decorateFutureSupplier(timeLimiter, futureSupplier);
 
         Object returnValue = Try.of(decorateFutureSupplier::call).getOrElse(this::fallback);
@@ -92,7 +92,7 @@ public class TimeLimiterController {
         handlePublishedEvents(timeLimiter);
         handlePublishedEvents(circuitBreaker);
         Supplier<CompletableFuture<Object>> futureSupplier = () ->
-                CompletableFuture.supplyAsync(resiliencyDataService::getDatafromRemoteServiceForFallbackPattern);
+                CompletableFuture.supplyAsync(resiliencyDataService::getDatafromRemoteService);
         Callable<Object> decorateFutureSupplier = TimeLimiter.decorateFutureSupplier(timeLimiter, futureSupplier);
         Callable<Object> callableDecoratedWithCircuitBreakerAndTimeLimiter =
                 CircuitBreaker.decorateCallable(circuitBreaker, decorateFutureSupplier);

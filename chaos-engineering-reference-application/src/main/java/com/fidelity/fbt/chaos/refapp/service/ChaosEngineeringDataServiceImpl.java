@@ -68,4 +68,21 @@ public class ChaosEngineeringDataServiceImpl implements ChaosEngineeringDataServ
 		return response;
 	}
 
+	@Override
+	public MockDataServiceResponse getMockOfferingsDataFromService(String id) {
+		LOGGER.info("Invoking ChaosEngineeringDataServiceImpl count {}", atomicInteger.incrementAndGet());
+		String hostedRegion = "";
+
+//		Region region = Regions.getCurrentRegion();
+//		if (region != null)
+//		{
+//			hostedRegion = region.getName();
+//		}
+
+		List<Offering> mockOffers = chaosEngineeringDataRepository.getSampleDataFromRepositoryById(id);
+		MockDataServiceResponse response = new MockDataServiceResponse();
+		response.setData(mockOffers);
+		response.setHostedRegion(hostedRegion);
+		return response;
+	}
 }

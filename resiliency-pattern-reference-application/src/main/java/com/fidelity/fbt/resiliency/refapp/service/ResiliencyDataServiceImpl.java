@@ -10,12 +10,16 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpMethod;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -46,9 +50,17 @@ public class ResiliencyDataServiceImpl implements ResiliencyDataService {
      */
 
     //@HystrixCommand(fallbackMethod ="fallbackOnFailure")
-    public Object getDatafromRemoteServiceForFallbackPattern() {
+    public Object getDatafromRemoteService() {
         LOGGER.info(" Call got past decorator and now invoking Remote Endpoint");
         Object responseEntity = this.restTemplate.getForObject(remoteServerUrl, Object.class);
+        return responseEntity;
+    }
+
+    public Object getDatafromRemoteService(String offerId) {
+        LOGGER.info(" Call got past decorator and now invoking Remote Endpoint for request with params");
+        Object responseEntity =
+                this.restTemplate.getForObject(String.format("%s/cache?offerId=%s", remoteServerUrl, offerId),
+                        Object.class);
         return responseEntity;
     }
 
