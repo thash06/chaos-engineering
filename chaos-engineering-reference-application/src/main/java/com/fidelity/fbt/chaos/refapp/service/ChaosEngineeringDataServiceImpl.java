@@ -38,7 +38,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 @Component(value = "chaosEngineeringDataService")
 public class ChaosEngineeringDataServiceImpl implements ChaosEngineeringDataService {
 	private static Logger LOGGER = LoggerFactory.getLogger(ChaosEngineeringDataServiceImpl.class);
-	private static final String SERVICE = "data-service";
 
 	private AtomicInteger atomicInteger = new AtomicInteger(0);
 	/**

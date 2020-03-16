@@ -109,17 +109,17 @@ public class TimeLimiterController {
     }
     private void handlePublishedEvents(CircuitBreaker circuitBreaker) {
         circuitBreaker.getEventPublisher()
-                .onCallNotPermitted(event -> LOGGER.debug(" onCallNotPermitted {}", event))
-                .onError(event -> LOGGER.debug(" onError {}", event))
+                .onCallNotPermitted(event -> LOGGER.info(" onCallNotPermitted {}", event))
+                .onError(event -> LOGGER.error(" onError {}", event))
                 .onFailureRateExceeded(event -> LOGGER.debug(" onFailureRateExceeded {}", event))
                 .onIgnoredError(event -> LOGGER.debug(" onIgnoredError {}", event))
                 .onReset(event -> LOGGER.info(" onReset {}", event))
                 .onStateTransition(event -> {
-                    if(event.getStateTransition() == CircuitBreaker.StateTransition.OPEN_TO_HALF_OPEN) {
-                        LOGGER.debug(" onStateTransition OPEN_TO_HALF_OPEN {}", event.getStateTransition());
+                    if(event.getStateTransition() == CircuitBreaker.StateTransition.CLOSED_TO_OPEN) {
+                        LOGGER.info(" onStateTransition CLOSED_TO_OPEN {}", event.getStateTransition());
                     }
-                    else if(event.getStateTransition() == CircuitBreaker.StateTransition.HALF_OPEN_TO_CLOSED){
-                        LOGGER.debug(" onStateTransition HALF_OPEN_TO_CLOSED {}", event.getStateTransition());
+                    else if(event.getStateTransition() == CircuitBreaker.StateTransition.OPEN_TO_HALF_OPEN){
+                        LOGGER.debug(" onStateTransition OPEN_TO_HALF_OPEN {}", event.getStateTransition());
                     }
                     else{
                         LOGGER.debug(" onStateTransition something else {}", event.getStateTransition());

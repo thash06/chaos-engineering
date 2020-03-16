@@ -18,10 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.client.ResourceAccessException;
 
 import java.net.ConnectException;
-import java.util.Arrays;
-import java.util.Timer;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.Function;
 import java.util.function.Supplier;
 
 /**
@@ -54,12 +51,12 @@ public class RetryController {
      * @return This endpoint returns mock response for demonstrating fallback resiliency pattern
      */
     @GetMapping("/retry")
-    public Object getMockOfferings(int maxSize) {
+    public Object getMockOfferings() {
         LOGGER.info("Invoking RetryController count {} ", atomicInteger.incrementAndGet());
-        return executeWithRetry(resiliencyDataService::getDatafromRemoteServiceForFallbackPattern, this::fallback);
+        return executeWithRetry(resiliencyDataService::getDatafromRemoteServiceForFallbackPattern);
     }
 
-    private <T> T executeWithRetry(Supplier<T> supplier, Function<Throwable, T> fallback) {
+    private <T> T executeWithRetry(Supplier<T> supplier) {
         RetryConfig retryConfig = createRetryConfig();
         retryRegistry = RetryRegistry.of(retryConfig);
         retry = Retry.of(DATA_SERVICE, retryConfig);

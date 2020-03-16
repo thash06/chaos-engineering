@@ -3,13 +3,10 @@ package com.fidelity.fbt.resiliency.refapp.controller;
 import com.fidelity.fbt.resiliency.refapp.exception.ChaosEngineeringException;
 import com.fidelity.fbt.resiliency.refapp.model.MockClientServiceResponse;
 import com.fidelity.fbt.resiliency.refapp.service.ResiliencyDataService;
-import io.github.resilience4j.bulkhead.ThreadPoolBulkheadRegistry;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import io.github.resilience4j.decorators.Decorators;
-import io.github.resilience4j.ratelimiter.RateLimiterRegistry;
-import io.github.resilience4j.timelimiter.TimeLimiterRegistry;
 import io.vavr.control.Try;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,11 +37,7 @@ public class CircuitBreakerController {
     private CircuitBreaker circuitBreaker;
 
 
-    public CircuitBreakerController(
-            ResiliencyDataService resiliencyDataService,
-            ThreadPoolBulkheadRegistry threadPoolBulkheadRegistry,
-            RateLimiterRegistry rateLimiterRegistry,
-            TimeLimiterRegistry timeLimiterRegistry) {
+    public CircuitBreakerController(ResiliencyDataService resiliencyDataService) {
         this.resiliencyDataService = resiliencyDataService;
         this.circuitBreaker = createCircuitBreaker();
 
