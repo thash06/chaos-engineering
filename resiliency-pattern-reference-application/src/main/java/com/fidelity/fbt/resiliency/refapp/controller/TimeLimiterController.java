@@ -130,13 +130,8 @@ public class TimeLimiterController {
                 .cancelRunningFuture(true)
                 .timeoutDuration(Duration.ofMillis(waitTimeForThread))
                 .build();
-
         TimeLimiterRegistry timeLimiterRegistry = TimeLimiterRegistry.of(timeLimiterConfig);
-
-
         return timeLimiterRegistry.timeLimiter(DATA_SERVICE, timeLimiterConfig);
-
-
     }
 
     private MockClientServiceResponse fallback() {

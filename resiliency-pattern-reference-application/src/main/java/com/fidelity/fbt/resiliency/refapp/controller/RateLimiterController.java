@@ -30,11 +30,9 @@ public class RateLimiterController {
      * Data layer dependency for invoking data methods
      */
     private final ResiliencyDataService resiliencyDataService;
-    private RateLimiter rateLimiter;
 
     public RateLimiterController(
             ResiliencyDataService resiliencyDataService) {
-        //this.chaosEngineeringDataService = chaosEngineeringDataService;
         this.resiliencyDataService = resiliencyDataService;
     }
 
@@ -76,22 +74,26 @@ public class RateLimiterController {
                     .withFallback(Arrays.asList(ConnectException.class), throwable -> (T) fallback(throwable))
                     .withRateLimiter(rateLimiter)
                     .decorate();
-
+            handlePublisherEvents(rateLimiter, successfulRemoteCalls, rejectedRemoteCalls);
             Try.ofCallable(decoratedCallable)
                     .onFailure(throwable -> rejectedRemoteCalls.add(throwable.toString()))
                     .onSuccess(t -> returnValues.add(t));
-            rateLimiter.getEventPublisher()
-                    .onSuccess(event -> {
-                        successfulRemoteCalls.add(Thread.currentThread().getName());
-                        LOGGER.debug("Successful remote call {} ", Thread.currentThread().getName());
-                    })
-                    .onFailure(event -> {
-                        rejectedRemoteCalls.add(Thread.currentThread().getName());
-                        LOGGER.error("Rejected remote call {} ", Thread.currentThread().getName());
-                    });
+
         } catch (Exception e) {
             LOGGER.error(Thread.currentThread().getName() + " threw exception " + e.getMessage());
         }
+    }
+
+    private void handlePublisherEvents(RateLimiter rateLimiter, Set<String> successfulRemoteCalls, Set<String> rejectedRemoteCalls) {
+        rateLimiter.getEventPublisher()
+                .onSuccess(event -> {
+                    successfulRemoteCalls.add(Thread.currentThread().getName());
+                    LOGGER.debug("Successful remote call {} ", Thread.currentThread().getName());
+                })
+                .onFailure(event -> {
+                    rejectedRemoteCalls.add(Thread.currentThread().getName());
+                    LOGGER.error("Rejected remote call {} ", Thread.currentThread().getName());
+                });
     }
 
     private RateLimiter createRateLimiter(int limitForPeriod, int windowInSeconds, int waitTimeForThread) {
@@ -100,13 +102,8 @@ public class RateLimiterController {
                 .limitForPeriod(limitForPeriod)
                 .timeoutDuration(Duration.ofMillis(waitTimeForThread))
                 .build();
-
         RateLimiterRegistry rateLimiterRegistry = RateLimiterRegistry.of(rateLimiterConfig);
-
-
         return rateLimiterRegistry.rateLimiter(DATA_SERVICE, rateLimiterConfig);
-
-
     }
 
     private MockClientServiceResponse fallback(Throwable ex) {

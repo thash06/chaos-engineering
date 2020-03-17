@@ -1,9 +1,15 @@
 # Chaos-engineering
 This project consists of implementations of a few patterns that allow remote or local services achieve fault tolerance 
 (i.e resiliency) in the face of events such as service failure, too many concurrent requests etc. 
-The frameworks of choice is resilience4j which provides higher-order functions (decorators) to enhance any functional interface,
-lambda expression or method reference with a Circuit Breaker, Rate Limiter, Retry or Bulkhead. We can choose to use one or more
-of these "Decorators" to meet our objective.
+Failures cannot be prevented but the goal should be to build adaptive solution and prevent cascading failures from 
+bringing down a system built upon microservices.
+
+Hystrix one of the pioneer frameworks providing such functionality has been in maintenance mode since 2018 and Resiliency4j 
+has been filing the void.
+
+Resilience4j is a framework that provides higher-order functions (decorators) and/or annotationsto enhance any method call, 
+functional interface, lambda expression or method reference with a Circuit Breaker, Rate Limiter, Retry or Bulkhead. 
+We can choose to use one or more of these "Decorators" to meet our resiliency objective.
 
 ## Retry with exponential backoff
 In the even of failure due to unavailability or any of the Exceptions listed in retryExceptions() method listed below, 
@@ -99,10 +105,66 @@ permittedNumberOfCallsInHalfOpenState() to go through to determine if the status
         CircuitBreakerRegistry circuitBreakerRegistry = CircuitBreakerRegistry.of(circuitBreakerConfig);
         return circuitBreakerRegistry.circuitBreaker(DATA_SERVICE);
     }
+## Time Limiter
 
-## Rate Limiting
+```
+    private TimeLimiter createTimeLimiter(int waitTimeForThread) {
+        TimeLimiterConfig timeLimiterConfig = TimeLimiterConfig.custom()
+                .cancelRunningFuture(true)
+                .timeoutDuration(Duration.ofMillis(waitTimeForThread))
+                .build();
+        TimeLimiterRegistry timeLimiterRegistry = TimeLimiterRegistry.of(timeLimiterConfig);
+        return timeLimiterRegistry.timeLimiter(DATA_SERVICE, timeLimiterConfig);
+    }
+    private <T> T callRemoteService(TimeLimiter timeLimiter) throws Exception {
+        handlePublishedEvents(timeLimiter);
+        Supplier<CompletableFuture<Object>> futureSupplier = () ->
+                CompletableFuture.supplyAsync(resiliencyDataService::getDatafromRemoteService);
+        Callable<Object> decorateFutureSupplier = TimeLimiter.decorateFutureSupplier(timeLimiter, futureSupplier);
+
+        Object returnValue = Try.of(decorateFutureSupplier::call).getOrElse(this::fallback);
+        //.getOrElseThrow(throwable -> new Exception("Request timed out: " + throwable.getMessage()));
+        return (T) returnValue;
+    }
+```
+
+The code snippet above creates a TimeLimiter with a configurableTimeout duration which states that if the remote call execution 
+takes longer than the timeoutDuration() the call is terminated and an exception or a cached/fallback value returned to caller.
+
+## Rate Limiter
+```
+    private RateLimiter createRateLimiter(int limitForPeriod, int windowInSeconds, int waitTimeForThread) {
+        RateLimiterConfig rateLimiterConfig = RateLimiterConfig.custom()
+                .limitRefreshPeriod(Duration.ofSeconds(windowInSeconds))
+                .limitForPeriod(limitForPeriod)
+                .timeoutDuration(Duration.ofMillis(waitTimeForThread))
+                .build();
+        RateLimiterRegistry rateLimiterRegistry = RateLimiterRegistry.of(rateLimiterConfig);
+        return rateLimiterRegistry.rateLimiter(DATA_SERVICE, rateLimiterConfig);
+    }
+    private <T> void callRemoteService(RateLimiter rateLimiter, List<Object> returnValues, Set<String> successfulRemoteCalls, Set<String> rejectedRemoteCalls) {
+        try {
+            Callable<T> callable = () -> (T) resiliencyDataService.getDatafromRemoteService();
+            Callable<T> decoratedCallable = Decorators.ofCallable(callable)
+                    .withFallback(Arrays.asList(ConnectException.class), throwable -> (T) fallback(throwable))
+                    .withRateLimiter(rateLimiter)
+                    .decorate();
+            handlePublisherEvents(rateLimiter, successfulRemoteCalls, rejectedRemoteCalls);
+            Try.ofCallable(decoratedCallable)
+                    .onFailure(throwable -> rejectedRemoteCalls.add(throwable.toString()))
+                    .onSuccess(t -> returnValues.add(t));
+
+        } catch (Exception e) {
+            LOGGER.error(Thread.currentThread().getName() + " threw exception " + e.getMessage());
+        }
+    }
+```
 Rate limiting is an imperative technique to prepare your API for scale and establish high availability and reliability of 
 your service.
+The code snippet above creats a RateLimiter instance which allows only a specified number of calls (_limitForPeriod(limitForPeriod)_)
+in a time window (_limitRefreshPeriod(Duration.ofSeconds(windowInSeconds))_). Calls that exceed the limit can wait for
+the duration specified in (_timeoutDuration(Duration.ofMillis(waitTimeForThread))_). 
+Requests that do  not get processed within the _limitRefreshPeriod + timeoutDuration_ are rejected.
 
 ## Bulkhead
 Used to limit the number of concurrent calls to a service. If clients send more than the number of concurrent calls 
