@@ -3,6 +3,7 @@ package com.fidelity.fbt.resiliency.refapp.service;
 import com.fidelity.fbt.resiliency.refapp.enums.CouponType;
 import com.fidelity.fbt.resiliency.refapp.enums.MarketType;
 import com.fidelity.fbt.resiliency.refapp.enums.ProductType;
+import com.fidelity.fbt.resiliency.refapp.exception.ChaosEngineeringException;
 import com.fidelity.fbt.resiliency.refapp.model.MockClientServiceResponse;
 import com.fidelity.fbt.resiliency.refapp.model.Offering;
 import org.slf4j.Logger;
@@ -10,16 +11,12 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpMethod;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -43,23 +40,19 @@ public class ResiliencyDataServiceImpl implements ResiliencyDataService {
     @Autowired
     private RestTemplate restTemplate;
 
-
-    /**
-     * TODO - Need to see if this annotation can be controlled through the interface, rather than impl class
-     * This method returns mock response from a remote data service using rest template
-     */
-
-    //@HystrixCommand(fallbackMethod ="fallbackOnFailure")
-    public Object getDatafromRemoteService() {
-        LOGGER.info(" Call got past decorator and now invoking Remote Endpoint");
-        Object responseEntity = this.restTemplate.getForObject(remoteServerUrl, Object.class);
+    @Override
+    public Object getDatafromRemoteService(Object throwException) throws ChaosEngineeringException {
+        LOGGER.info(" Call got past decorator and now invoking Remote Endpoint throwException {} ", throwException);
+        Object responseEntity = this.restTemplate.getForObject(String.format("%s?throwException=%s", remoteServerUrl, throwException), Object.class);
         return responseEntity;
     }
 
-    public Object getDatafromRemoteService(String offerId) {
+    @Override
+    public Object getDatafromRemoteService(String offerId, Object throwException) throws ChaosEngineeringException {
         LOGGER.info(" Call got past decorator and now invoking Remote Endpoint for request with params");
         Object responseEntity =
-                this.restTemplate.getForObject(String.format("%s/cache?offerId=%s", remoteServerUrl, offerId),
+                this.restTemplate.getForObject(String.format("%s/cache?offerId=%s&throwException=%s",
+                        remoteServerUrl, offerId, throwException),
                         Object.class);
         return responseEntity;
     }
@@ -69,6 +62,7 @@ public class ResiliencyDataServiceImpl implements ResiliencyDataService {
      * Suppress false warnings for the fallback method
      */
     @SuppressWarnings("unused")
+    @Override
     public MockClientServiceResponse fallbackOnFailure() {
 
         List<Offering> cachedMockedOfferings = new ArrayList<Offering>();

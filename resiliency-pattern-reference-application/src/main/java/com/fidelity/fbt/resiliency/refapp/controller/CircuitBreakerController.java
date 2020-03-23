@@ -3,26 +3,28 @@ package com.fidelity.fbt.resiliency.refapp.controller;
 import com.fidelity.fbt.resiliency.refapp.exception.ChaosEngineeringException;
 import com.fidelity.fbt.resiliency.refapp.model.MockClientServiceResponse;
 import com.fidelity.fbt.resiliency.refapp.service.ResiliencyDataService;
+import com.fidelity.fbt.resiliency.refapp.util.DecoratorUtil;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import io.github.resilience4j.decorators.Decorators;
-import io.vavr.control.Try;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.web.client.ResourceAccessException;
 
 import java.net.ConnectException;
 import java.time.Duration;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.Supplier;
+import java.util.function.Function;
 
 @RestController
 @RequestMapping("resiliency-pattern")
-public class CircuitBreakerController {
+public class CircuitBreakerController<T, R> {
     private static Logger LOGGER = LoggerFactory.getLogger(CircuitBreakerController.class);
     private AtomicInteger atomicInteger = new AtomicInteger(0);
     private static final String DATA_SERVICE = "data-service";
@@ -31,10 +33,12 @@ public class CircuitBreakerController {
      */
     private final ResiliencyDataService resiliencyDataService;
     private CircuitBreaker circuitBreaker;
+    private final DecoratorUtil<T, R> decoratorUtil;
 
 
-    public CircuitBreakerController(ResiliencyDataService resiliencyDataService) {
+    public CircuitBreakerController(ResiliencyDataService resiliencyDataService, DecoratorUtil<T, R> decoratorUtil) {
         this.resiliencyDataService = resiliencyDataService;
+        this.decoratorUtil = decoratorUtil;
         this.circuitBreaker = createCircuitBreaker();
 
     }
@@ -44,9 +48,11 @@ public class CircuitBreakerController {
      * @return This endpoint returns mock response for demonstrating fallback resiliency pattern
      */
     @GetMapping("/circuit-breaker")
-    public Object getMockOfferings() {
-        LOGGER.info("Invoking CircuitBreakerController {}", atomicInteger.incrementAndGet());
-        return executeWithCircuitBreaker(resiliencyDataService::getDatafromRemoteService);
+    public Object getMockOfferings(@RequestParam Boolean throwException) {
+        LOGGER.info("Invoking CircuitBreakerController CircuitBreaker State is : {} ", circuitBreaker.getState().name());
+        Decorators.DecorateFunction<T, R> decoratedFunction =
+                decoratorUtil.decorateFunction(throwException1 -> (R) resiliencyDataService.getDatafromRemoteService(throwException1));
+        return executeWithCircuitBreaker(decoratedFunction, throwException);
     }
 
 //    private <T> T execute(Supplier<T> supplier, Function<Throwable, T> fallback) {
@@ -61,16 +67,16 @@ public class CircuitBreakerController {
 //    }
 
 
-    private <T> T executeWithCircuitBreaker(Supplier<T> supplier) {
-        Supplier<T> decoratedSupplier = Decorators.ofSupplier(supplier)
-                .withCircuitBreaker(circuitBreaker)
-                .decorate();
+    private <R> R executeWithCircuitBreaker(Decorators.DecorateFunction<T, R> checkedFunction, Boolean throwException) {
         handlePublisherEvents();
+        Function<T, R> circuitBreakerFunction = checkedFunction
+                .withCircuitBreaker(circuitBreaker).decorate();
+        return circuitBreakerFunction.apply((T) throwException);
 
-        return Try.ofSupplier(decoratedSupplier).getOrElseGet(throwable -> {
-            String response = "{CircuitBreaker State is : " + circuitBreaker.getState().name() + ", \n Returning cached response: " + fallback() + "}";
-            return (T) response;
-        });
+//        return Try.ofSupplier(decoratedSupplier).getOrElseGet(throwable -> {
+//            String response = "{CircuitBreaker State is : " + circuitBreaker.getState().name() + ", \n Returning cached response: " + fallback() + "}";
+//            return (T) response;
+//        });
     }
 
     private void handlePublisherEvents() {
@@ -99,7 +105,7 @@ public class CircuitBreakerController {
                 .waitDurationInOpenState(Duration.ofMillis(10000))
                 .permittedNumberOfCallsInHalfOpenState(2)
                 .slidingWindowSize(4)
-                .recordExceptions(ConnectException.class, ResourceAccessException.class)
+                .recordExceptions(ConnectException.class, ResourceAccessException.class, HttpServerErrorException.class)
                 .ignoreExceptions(ChaosEngineeringException.class)
                 .build();
         CircuitBreakerRegistry circuitBreakerRegistry = CircuitBreakerRegistry.of(circuitBreakerConfig);
