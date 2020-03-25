@@ -30,7 +30,7 @@ class DecoratedControllerTest {
 //    private TestRestTemplate restTemplate;
 
     @Test
-    void testSemaphoreBulkead() throws ExecutionException, InterruptedException {
+    void testSemaphoreBulkhead() throws ExecutionException, InterruptedException {
         String url = String.format("http://localhost:%d/decorated-services/offeringsById", port);
         WebClient webClient = WebClient.create(url);
         Boolean throwException = Boolean.FALSE;

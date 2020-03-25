@@ -247,4 +247,93 @@ A small test stub that simulates sending 20 concurrent requests is shown below.
     }
 ```
  
+ ##Chaos-engineering-reference-application
+ The producer application also has a decorated endpoint DecoratedController for use cases where the consumer does not want to 
+ go through a proxy layer.
+ It has 3 endpoints
+ 1. http://localhost:%d/decorated-services/offeringsById
+ 2. http://localhost:%d/decorated-services/offerings
+ 3. http://localhost:%d/decorated-services/offeringsWithRetry
+ 
+    The first end point is decorated by a just a Semaphore Bulkhead. The Bulkhead is configure with the number of available 
+cores on the machine the application runs on. In my case it is 8 so when I send 10 concurrent requests 2 of the requests fail.
+'''
+    private Bulkhead createBulkhead(int availableProcessors) {
+        BulkheadConfig bulkheadConfig = BulkheadConfig.custom()
+                .maxConcurrentCalls(availableProcessors)
+                .maxWaitDuration(Duration.ofMillis(100))
+                .writableStackTraceEnabled(true)
+                .build();
+
+        BulkheadRegistry bulkheadRegistry = BulkheadRegistry.of(bulkheadConfig);
+        return bulkheadRegistry.bulkhead(SEMAPHORE_BULKHEAD);
+    }
+''' 
+    The second endpoint is decorated with a ThreadPoolBulkhead and a Retry so even when 2 concurrent requests fail due 
+BulkheadFullException the retry mechanism re-submits them and the requests get processed successfully.
+'''
+    private ThreadPoolBulkhead createThreadPoolBulkhead(int availableProcessors) {
+        int coreThreadPoolSizeFactor = availableProcessors >= 8 ? 4 : 1;
+        int coreThreadPoolSize = availableProcessors - coreThreadPoolSizeFactor;
+        ThreadPoolBulkheadConfig threadPoolBulkheadConfig = ThreadPoolBulkheadConfig.custom()
+                .maxThreadPoolSize(availableProcessors)
+                .coreThreadPoolSize(coreThreadPoolSize)
+                .queueCapacity(1)
+                .keepAliveDuration(Duration.ofMillis(10))
+                .build();
+        LOGGER.info("ThreadPoolBulkheadConfig created with maxThreadPoolSize {} : coreThreadPoolSize {}",
+                availableProcessors, coreThreadPoolSize);
+        ThreadPoolBulkheadRegistry threadPoolBulkheadRegistry = ThreadPoolBulkheadRegistry.of(threadPoolBulkheadConfig);
+        return threadPoolBulkheadRegistry.bulkhead(THREAD_POOL_BULKHEAD);
+    }
+    private MockDataServiceResponse callBulkheadAndRetryDecoratedService() throws ExecutionException, InterruptedException {
+        handlePublisherEvents(threadPoolBulkhead);
+        Retry retryContext = Retry.ofDefaults("retry-for-bulkhead");
+        handlePublishedEvents(retryContext);
+        Supplier<MockDataServiceResponse> serviceAsSupplier = createServiceAsSupplier();
+
+        Supplier<CompletionStage<MockDataServiceResponse>> decorate = Decorators.ofSupplier(serviceAsSupplier)
+                .withThreadPoolBulkhead(threadPoolBulkhead)
+                .withRetry(retryContext, Executors.newSingleThreadScheduledExecutor())
+                .decorate();
+        return decorate.get().toCompletableFuture().get();
+    }
+'''
+
+    The third method is protected by a ThreadPoolBulkhead and a TimeLimiter. The TimeLimiter is set to 400 milliseconds and 
+the remote method takes 500 milliseconds to execute. This results in 2 of the requests to fail due to BulkheadFullException
+and 8 requests to fail due to TimeoutException exception.
+
+'''
+    private MockDataServiceResponse callBulkheadDecoratedService() throws ExecutionException, InterruptedException {
+        handlePublisherEvents(threadPoolBulkhead);
+        Supplier<MockDataServiceResponse> serviceAsSupplier = createServiceAsSupplier();
+        CompletableFuture<MockDataServiceResponse> future = Decorators
+                .ofSupplier(() -> chaosEngineeringDataService.getMockOfferingsDataFromService())
+                .withThreadPoolBulkhead(threadPoolBulkhead)
+                .withTimeLimiter(timeLimiter, Executors.newSingleThreadScheduledExecutor())
+                .withFallback(BulkheadFullException.class, (e) -> {
+                    MockDataServiceResponse mockDataServiceResponse = new MockDataServiceResponse();
+                    mockDataServiceResponse.setHostedRegion(String.format("Request failed due to bulkheadName {%s} BulkheadFullException", e.getMessage()));
+                    return mockDataServiceResponse;
+
+                })
+                .withFallback(TimeoutException.class, (e) -> {
+                    MockDataServiceResponse mockDataServiceResponse = new MockDataServiceResponse();
+                    mockDataServiceResponse.setHostedRegion(String.format("Request failed due to TimeLimiter {%s} with duration {%s} due to TimeoutException",
+                            timeLimiter.getName(),
+                            timeLimiter.getTimeLimiterConfig().getTimeoutDuration()));
+                    return mockDataServiceResponse;
+
+                })
+                .get().toCompletableFuture();
+        return future.get();
+    }
+'''
+
+
+There is a unit test DecoratedControllerTest which covers these 3 methods. 
+It uses WebClient to send 10 concurrent requests for each methods inspect the responses in each case.
+
+ 
  

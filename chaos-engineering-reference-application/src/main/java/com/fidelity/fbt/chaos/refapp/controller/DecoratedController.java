@@ -130,7 +130,7 @@ public class DecoratedController<T, R> {
         return decorate.get().toCompletableFuture().get();
     }
 
-    private MockDataServiceResponse callBulkheadDecoratedService(String offerId) throws Throwable {
+    private MockDataServiceResponse callBulkheadDecoratedService(String offerId) {
         handlePublisherEvents(bulkhead);
         Callable<MockDataServiceResponse> callable = () -> {
             LOGGER.info("Invoking DecoratedController with Bulkhead offerId: {} count {} ", offerId, atomicInteger.incrementAndGet());
