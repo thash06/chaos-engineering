@@ -1,7 +1,9 @@
 package com.fidelity.fbt.resiliency.refapp.controller;
 
+import com.amazonaws.services.simpleworkflow.flow.core.TryCatch;
 import com.fidelity.fbt.resiliency.refapp.model.MockClientServiceResponse;
 import com.fidelity.fbt.resiliency.refapp.service.ResiliencyDataService;
+import com.fidelity.fbt.resiliency.refapp.util.DecoratorUtil;
 import io.github.resilience4j.bulkhead.Bulkhead;
 import io.github.resilience4j.bulkhead.BulkheadConfig;
 import io.github.resilience4j.bulkhead.BulkheadRegistry;
@@ -9,10 +11,12 @@ import io.github.resilience4j.decorators.Decorators;
 import io.vavr.control.Try;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.client.HttpServerErrorException;
 
 import java.time.Duration;
 import java.util.ArrayList;
@@ -21,10 +25,11 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Supplier;
 
 @RestController
 @RequestMapping("resiliency-pattern")
-public class BulkheadController {
+public class BulkheadController<T, R> {
     private static Logger LOGGER = LoggerFactory.getLogger(BulkheadController.class);
     private AtomicInteger atomicInteger = new AtomicInteger(0);
     private static final String DATA_SERVICE = "data-service";
@@ -32,10 +37,11 @@ public class BulkheadController {
      * Data layer dependency for invoking data methods
      */
     private final ResiliencyDataService resiliencyDataService;
-    private Bulkhead bulkhead;
+    private final DecoratorUtil<T, R> decoratorUtil;
 
-    public BulkheadController(ResiliencyDataService resiliencyDataService) {
+    public BulkheadController(ResiliencyDataService resiliencyDataService, DecoratorUtil<T, R> decoratorUtil) {
         this.resiliencyDataService = resiliencyDataService;
+        this.decoratorUtil = decoratorUtil;
     }
 
 
@@ -43,15 +49,15 @@ public class BulkheadController {
      * @return This endpoint returns mock response for demonstrating fallback resiliency pattern
      */
     @GetMapping("/bulkhead")
-    public Object getMockOfferings(@RequestParam int maxConcurrentCalls, @RequestParam int maxWaitDuration) {
+    public Object getMockOfferings(@RequestParam int maxConcurrentCalls, @RequestParam int maxWaitDuration,@RequestParam Boolean throwException) {
         LOGGER.info("Invoking BulkheadController count {} ", atomicInteger.incrementAndGet());
         //return executeWithBulkhead(maxConcurrentCalls, resiliencyDataService::getDatafromRemoteServiceForFallbackPattern, this::fallback);
-        return executeWithBulkhead(createBulkhead(maxConcurrentCalls, maxWaitDuration));
+        return executeWithBulkhead(createBulkhead(maxConcurrentCalls, maxWaitDuration), throwException);
 
     }
 
 
-    private <T> T executeWithBulkhead(Bulkhead bulkhead) {
+    private <T> T executeWithBulkhead(Bulkhead bulkhead, boolean throwException) {
         LOGGER.info("Created Bulkhead with {} max concurrent calls maxWaitDuration {} ",
                 bulkhead.getBulkheadConfig().getMaxConcurrentCalls(), bulkhead.getBulkheadConfig().getMaxWaitDuration());
         List<Object> returnValues = new ArrayList<>();
@@ -60,7 +66,7 @@ public class BulkheadController {
         for (int i = 0; i < noOfConcurrentReqSent; i++) {
             new Thread(() -> {
                 try {
-                    T returnValue = callRemoteService(bulkhead);
+                    T returnValue = callRemoteService(bulkhead, throwException);
                     returnValues.add(returnValue);
                 } catch (Exception e) {
                     rejectedRemoteCalls.add(Thread.currentThread().getName() + " due to " + e.getMessage());
@@ -82,21 +88,33 @@ public class BulkheadController {
         return (T) returnValues.get(returnValues.size() - 1);
     }
 
-    private <T> T callRemoteService(Bulkhead bulkhead) throws Exception {
-        Callable<T> callable = () -> (T) resiliencyDataService.getDatafromRemoteService();
+    private <T> T callRemoteService(Bulkhead bulkhead, boolean throwException) throws Exception {
+        Callable<T> callable = () -> (T) resiliencyDataService.getDatafromRemoteService(throwException);
         Callable<T> decoratedCallable = Decorators.ofCallable(callable)
                 .withBulkhead(bulkhead)
                 .decorate();
         handlePublisherEvents(bulkhead);
-        return Try.ofCallable(decoratedCallable).getOrElseThrow(() ->
-                new Exception("{Bulkhead full : " + bulkhead.getName() + ". Could return a cached response here}")
-        );
+        return Try.ofCallable(decoratedCallable)
+                .onFailure(throwable -> {
+                    LOGGER.error(" Failure reason {} ", throwable.getMessage(), throwable);
+                    if(HttpServerErrorException.class.isInstance(throwable)){
+                        if(((HttpServerErrorException) throwable).getStatusCode() == HttpStatus.INTERNAL_SERVER_ERROR){
+                            LOGGER.error(" Failure reason -> Server threw exception {} ", throwable.getMessage());
+                        }
+                    }
+                    else{
+                        LOGGER.error(" Failure reason -> Bulkhead exception {} ", throwable.getMessage());
+                    }
+                })
+                .get()
+                //.getOrElseThrow(() ->new Exception("{Bulkhead full : " + bulkhead.getName() + ". Could return a cached response here}")
+        ;
     }
 
     private void handlePublisherEvents(Bulkhead bulkhead) {
         bulkhead.getEventPublisher()
                 .onCallPermitted(event -> LOGGER.debug("Successful remote call {} ", Thread.currentThread().getName()))
-                .onCallRejected(event -> LOGGER.debug("Rejected remote call {} ", Thread.currentThread().getName()))
+                .onCallRejected(event -> LOGGER.warn("Rejected remote call {} ", Thread.currentThread().getName()))
                 .onCallFinished(event -> LOGGER.debug("Call Finished {} ", event));
     }
 

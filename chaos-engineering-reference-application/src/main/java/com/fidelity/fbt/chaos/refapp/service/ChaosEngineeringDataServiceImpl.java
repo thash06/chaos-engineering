@@ -52,7 +52,7 @@ public class ChaosEngineeringDataServiceImpl implements ChaosEngineeringDataServ
 	 */
 	@Override
 	public MockDataServiceResponse getMockOfferingsDataFromService() {
-		LOGGER.info("Invoking ChaosEngineeringDataServiceImpl count {}", atomicInteger.incrementAndGet());
+		LOGGER.debug("Invoking ChaosEngineeringDataServiceImpl count {}", atomicInteger.incrementAndGet());
 		String hostedRegion = "";
 
 //		Region region = Regions.getCurrentRegion();
@@ -70,7 +70,7 @@ public class ChaosEngineeringDataServiceImpl implements ChaosEngineeringDataServ
 
 	@Override
 	public MockDataServiceResponse getMockOfferingsDataFromService(String id) {
-		LOGGER.info("Invoking ChaosEngineeringDataServiceImpl count {}", atomicInteger.incrementAndGet());
+		//LOGGER.info("Invoking ChaosEngineeringDataServiceImpl count {}", atomicInteger.incrementAndGet());
 		String hostedRegion = "";
 
 //		Region region = Regions.getCurrentRegion();

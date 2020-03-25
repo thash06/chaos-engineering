@@ -19,6 +19,7 @@ import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Supplier;
 
 @RestController
 @RequestMapping("resiliency-pattern")
@@ -42,19 +43,20 @@ public class RateLimiterController {
      */
     @GetMapping("/rate-limiter")
     public Object getMockOfferings(@RequestParam int limitForPeriod, @RequestParam int windowInSeconds,
-                                   @RequestParam int waitTimeForThread, @RequestParam int numOfTestRequests) {
+                                   @RequestParam int waitTimeForThread, @RequestParam int numOfTestRequests,
+                                   @RequestParam Boolean throwException) {
         LOGGER.info("Invoking RateLimiterController count {} ", atomicInteger.incrementAndGet());
-        return executeWithRateLimiter(createRateLimiter(limitForPeriod, windowInSeconds, waitTimeForThread), numOfTestRequests);
+        return executeWithRateLimiter(createRateLimiter(limitForPeriod, windowInSeconds, waitTimeForThread), numOfTestRequests, throwException);
 
     }
 
 
-    private <T> T executeWithRateLimiter(RateLimiter rateLimiter, int numOfTestRequests) {
+    private <T> T executeWithRateLimiter(RateLimiter rateLimiter, int numOfTestRequests, boolean throwException) {
         List<Object> returnValues = new ArrayList<>();
         Set<String> successfulRemoteCalls = new HashSet<>();
         Set<String> rejectedRemoteCalls = new HashSet<>();
         for (int i = 0; i < numOfTestRequests; i++) {
-            callRemoteService(rateLimiter, returnValues, successfulRemoteCalls, rejectedRemoteCalls);
+            callRemoteService(rateLimiter, returnValues, successfulRemoteCalls, rejectedRemoteCalls, throwException);
         }
         LOGGER.info("Number of successful requests {} number of rejected requests {}", successfulRemoteCalls, rejectedRemoteCalls);
 
@@ -67,9 +69,10 @@ public class RateLimiterController {
         return (T) returnValues.get(returnValues.size() - 1);
     }
 
-    private <T> void callRemoteService(RateLimiter rateLimiter, List<Object> returnValues, Set<String> successfulRemoteCalls, Set<String> rejectedRemoteCalls) {
+    private <T> void callRemoteService(RateLimiter rateLimiter, List<Object> returnValues, Set<String> successfulRemoteCalls,
+                                       Set<String> rejectedRemoteCalls, boolean throwException) {
         try {
-            Callable<T> callable = () -> (T) resiliencyDataService.getDatafromRemoteService();
+            Callable<T> callable = () -> (T) resiliencyDataService.getDatafromRemoteService(throwException);
             Callable<T> decoratedCallable = Decorators.ofCallable(callable)
                     .withFallback(Arrays.asList(ConnectException.class), throwable -> (T) fallback(throwable))
                     .withRateLimiter(rateLimiter)

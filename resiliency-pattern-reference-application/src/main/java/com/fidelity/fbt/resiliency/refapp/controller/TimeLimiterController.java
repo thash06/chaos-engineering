@@ -62,21 +62,21 @@ public class TimeLimiterController {
      * @return This endpoint returns mock response for demonstrating fallback resiliency pattern
      */
     @GetMapping("/time-limiter")
-    public Object getMockOfferings(@RequestParam int waitTimeForThread) throws Exception {
+    public Object getMockOfferings(@RequestParam int waitTimeForThread, @RequestParam Boolean throwException) throws Exception {
         LOGGER.info("Invoking TimeLimiterController count {} ", atomicInteger.incrementAndGet());
-        return executeWithTimeLimiter(createTimeLimiter(waitTimeForThread));
+        return executeWithTimeLimiter(createTimeLimiter(waitTimeForThread), throwException);
 
     }
 
-    private <T> T executeWithTimeLimiter(TimeLimiter timeLimiter) throws Exception {
-        return callRemoteService1(timeLimiter);
+    private <T> T executeWithTimeLimiter(TimeLimiter timeLimiter, boolean throwException) throws Exception {
+        return callRemoteService(timeLimiter, throwException);
 
     }
 
-    private <T> T callRemoteService(TimeLimiter timeLimiter) throws Exception {
+    private <T> T callRemoteService(TimeLimiter timeLimiter, boolean throwException) throws Exception {
         handlePublishedEvents(timeLimiter);
-        Supplier<CompletableFuture<Object>> futureSupplier = () ->
-                CompletableFuture.supplyAsync(resiliencyDataService::getDatafromRemoteService);
+        Supplier<Object> supplier = () ->  resiliencyDataService.getDatafromRemoteService(throwException);
+        Supplier<CompletableFuture<Object>> futureSupplier = () -> CompletableFuture.supplyAsync(supplier);
         Callable<Object> decorateFutureSupplier = TimeLimiter.decorateFutureSupplier(timeLimiter, futureSupplier);
 
         Object returnValue = Try.of(decorateFutureSupplier::call).getOrElse(this::fallback);
@@ -84,12 +84,15 @@ public class TimeLimiterController {
         return (T) returnValue;
     }
 
-    private <T> T callRemoteService1(TimeLimiter timeLimiter) throws Exception {
+    private <T> T callRemoteService1(TimeLimiter timeLimiter, boolean throwException) throws Exception {
 
         handlePublishedEvents(timeLimiter);
         handlePublishedEvents(circuitBreaker);
+        Supplier<Object> supplier = () -> {
+            return resiliencyDataService.getDatafromRemoteService(throwException);
+        };
         Supplier<CompletableFuture<Object>> futureSupplier = () ->
-                CompletableFuture.supplyAsync(resiliencyDataService::getDatafromRemoteService);
+                CompletableFuture.supplyAsync(supplier);
         Callable<Object> decorateFutureSupplier = TimeLimiter.decorateFutureSupplier(timeLimiter, futureSupplier);
         Callable<Object> callableDecoratedWithCircuitBreakerAndTimeLimiter =
                 CircuitBreaker.decorateCallable(circuitBreaker, decorateFutureSupplier);

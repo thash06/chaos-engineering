@@ -47,14 +47,13 @@ public class ChaosEngineeringDataRepositoryImpl implements ChaosEngineeringDataR
 	@Override
 	public List<Offering> getSampleDataFromRepository() {
 		// Ideally here we connect to database and fetch offerings data, for this POC, we will return some dummy offerings
-		LOGGER.info("getSampleDataFromRepository going to sleep");
+		LOGGER.debug("getSampleDataFromRepository going to sleep");
 		try {
 			Thread.sleep(500);
-		}
-		catch (Exception e){
+		} catch (Exception e) {
 			e.printStackTrace();
 		}
-		LOGGER.info("getSampleDataFromRepository waking up");
+		LOGGER.debug("getSampleDataFromRepository waking up");
 		return getDummyOfferings();
 	}
 

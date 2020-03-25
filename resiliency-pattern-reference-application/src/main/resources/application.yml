@@ -74,13 +74,16 @@ resilience4j.circuitbreaker:
 resilience4j.retry:
   configs:
     default:
-      waitDuration: 1000
-      maxRetryAttempts: 10
+      waitDuration: 500
+      enableExponentialBackOff: true
+      exponentialBackoffMultiplier: 5
+      maxRetryAttempts: 5
       retryExceptions:
         - java.net.ConnectException
         - org.springframework.web.client.ResourceAccessException
+        - org.springframework.web.client.HttpServerErrorException
       ignoreExceptions:
-        - com.fidelity.fbt.resiliency.refapp.exception.ChaosEngineeringException
+        - java.io.IOException
   instances:
     data-service:
       baseConfig: default
