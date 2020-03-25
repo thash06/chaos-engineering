@@ -291,7 +291,6 @@ BulkheadFullException the retry mechanism re-submits them and the requests get p
         Retry retryContext = Retry.ofDefaults("retry-for-bulkhead");
         handlePublishedEvents(retryContext);
         Supplier<MockDataServiceResponse> serviceAsSupplier = createServiceAsSupplier();
-
         Supplier<CompletionStage<MockDataServiceResponse>> decorate = Decorators.ofSupplier(serviceAsSupplier)
                 .withThreadPoolBulkhead(threadPoolBulkhead)
                 .withRetry(retryContext, Executors.newSingleThreadScheduledExecutor())
@@ -316,7 +315,6 @@ and 8 requests to fail due to TimeoutException exception.
                     MockDataServiceResponse mockDataServiceResponse = new MockDataServiceResponse();
                     mockDataServiceResponse.setHostedRegion(String.format("Request failed due to bulkheadName {%s} BulkheadFullException", e.getMessage()));
                     return mockDataServiceResponse;
-
                 })
                 .withFallback(TimeoutException.class, (e) -> {
                     MockDataServiceResponse mockDataServiceResponse = new MockDataServiceResponse();
@@ -324,7 +322,6 @@ and 8 requests to fail due to TimeoutException exception.
                             timeLimiter.getName(),
                             timeLimiter.getTimeLimiterConfig().getTimeoutDuration()));
                     return mockDataServiceResponse;
-
                 })
                 .get().toCompletableFuture();
         return future.get();
