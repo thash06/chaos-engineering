@@ -2,7 +2,10 @@ package com.fidelity.fbt.chaos.refapp.controller;
 
 import com.fidelity.fbt.chaos.refapp.ChaosEngineeringReferenceApplication;
 import com.fidelity.fbt.chaos.refapp.model.MockDataServiceResponse;
+import org.junit.jupiter.api.MethodOrderer;
+import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestMethodOrder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -11,7 +14,6 @@ import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -21,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 @SpringBootTest(classes = ChaosEngineeringReferenceApplication.class,
         webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class DecoratedControllerTest {
     private static Logger LOGGER = LoggerFactory.getLogger(DecoratedControllerTest.class);
     @LocalServerPort
@@ -30,6 +33,7 @@ class DecoratedControllerTest {
 //    private TestRestTemplate restTemplate;
 
     @Test
+    @Order(1)
     void testSemaphoreBulkhead() throws ExecutionException, InterruptedException {
         String url = String.format("http://localhost:%d/decorated-services/offeringsById", port);
         WebClient webClient = WebClient.create(url);
@@ -51,22 +55,19 @@ class DecoratedControllerTest {
                 })
                 .collectList();
         CompletableFuture<List<MockDataServiceResponse>> listCompletableFuture = listMono.toFuture();
-        List<String> failedRequests = new ArrayList<>();
-        List<MockDataServiceResponse> sucessfulRequests = new ArrayList<>();
-        listCompletableFuture.get().forEach(
-                val -> {
-                    if (val.getData() == null || val.getData().isEmpty()) {
-                        failedRequests.add(val.getHostedRegion());
-                    } else {
-                        sucessfulRequests.add(val);
-                    }
-                }
-        );
-        assertEquals(8, sucessfulRequests.size());
+        List<MockDataServiceResponse> successfulRequests = listCompletableFuture.get().stream()
+                .filter(val -> val.getData() != null)
+                .collect(Collectors.toList());
+        List<String> failedRequests = listCompletableFuture.get().stream()
+                .filter(val -> val.getData() == null || val.getData().isEmpty())
+                .map(val -> val.getHostedRegion())
+                .collect(Collectors.toList());
+        assertEquals(8, successfulRequests.size());
         assertEquals(2, failedRequests.size());
     }
 
     @Test
+    @Order(2)
     void testThreadPoolBulkheadWithTimeLimiter() throws ExecutionException, InterruptedException {
         String url = String.format("http://localhost:%d/decorated-services/offerings", port);
         WebClient webClient = WebClient.create(url);
@@ -85,18 +86,14 @@ class DecoratedControllerTest {
                 .map(result -> result)
                 .collectList();
         CompletableFuture<List<MockDataServiceResponse>> listCompletableFuture = listMono.toFuture();
-        List<String> failedRequests = new ArrayList<>();
-        List<MockDataServiceResponse> sucessfulRequests = new ArrayList<>();
-        listCompletableFuture.get().forEach(
-                val -> {
-                    if (val.getData() == null || val.getData().isEmpty()) {
-                        failedRequests.add(val.getHostedRegion());
-                    } else {
-                        sucessfulRequests.add(val);
-                    }
-                }
-        );
-        assertEquals(0, sucessfulRequests.size());
+        List<MockDataServiceResponse> successfulRequests = listCompletableFuture.get().stream()
+                .filter(val -> val.getData() != null)
+                .collect(Collectors.toList());
+        List<String> failedRequests = listCompletableFuture.get().stream()
+                .filter(val -> val.getData() == null || val.getData().isEmpty())
+                .map(val -> val.getHostedRegion())
+                .collect(Collectors.toList());
+        assertEquals(0, successfulRequests.size());
         assertEquals(10, failedRequests.size());
         assertEquals(1,
                 failedRequests.stream().filter(response -> response.contains("thread-pool-bulkhead")).collect(Collectors.toList()).size());
@@ -105,6 +102,7 @@ class DecoratedControllerTest {
     }
 
     @Test
+    @Order(3)
     void testThreadPoolBulkheadWithRetry() throws ExecutionException, InterruptedException {
         String url = String.format("http://localhost:%d/decorated-services/offeringsWithRetry", port);
         WebClient webClient = WebClient.create(url);
@@ -126,17 +124,13 @@ class DecoratedControllerTest {
                 })
                 .collectList();
         CompletableFuture<List<MockDataServiceResponse>> listCompletableFuture = listMono.toFuture();
-        List<String> failedRequests = new ArrayList<>();
-        List<MockDataServiceResponse> successfulRequests = new ArrayList<>();
-        listCompletableFuture.get().forEach(
-                val -> {
-                    if (val.getData() == null || val.getData().isEmpty()) {
-                        failedRequests.add(val.getHostedRegion());
-                    } else {
-                        successfulRequests.add(val);
-                    }
-                }
-        );
+        List<MockDataServiceResponse> successfulRequests = listCompletableFuture.get().stream()
+                .filter(val -> val.getData() != null)
+                .collect(Collectors.toList());
+        List<String> failedRequests = listCompletableFuture.get().stream()
+                .filter(val -> val.getData() == null || val.getData().isEmpty())
+                .map(val -> val.getHostedRegion())
+                .collect(Collectors.toList());
         assertEquals(10, successfulRequests.size());
         assertEquals(0, failedRequests.size());
     }

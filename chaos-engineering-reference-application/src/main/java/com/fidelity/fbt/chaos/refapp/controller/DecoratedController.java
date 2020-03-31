@@ -4,6 +4,9 @@ import com.fidelity.fbt.chaos.refapp.exception.ChaosEngineeringException;
 import com.fidelity.fbt.chaos.refapp.model.MockDataServiceResponse;
 import com.fidelity.fbt.chaos.refapp.service.ChaosEngineeringDataService;
 import io.github.resilience4j.bulkhead.*;
+import io.github.resilience4j.circuitbreaker.CircuitBreaker;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import io.github.resilience4j.core.IntervalFunction;
 import io.github.resilience4j.decorators.Decorators;
 import io.github.resilience4j.retry.Retry;
@@ -15,7 +18,6 @@ import io.vavr.CheckedFunction1;
 import io.vavr.control.Try;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -38,6 +40,7 @@ public class DecoratedController<T, R> {
     private static final String SEMAPHORE_BULKHEAD = "semaphore-bulkhead";
     private static final String THREAD_POOL_BULKHEAD = "thread-pool-bulkhead";
     private static final String RETRY_SERVICE = "retry-for-bulkhead";
+    public static final String CIRCUIT_BREAKER = "circuit-breaker";
 
     private final ChaosEngineeringDataService chaosEngineeringDataService;
     private final ThreadPoolBulkhead threadPoolBulkhead;
@@ -59,16 +62,14 @@ public class DecoratedController<T, R> {
 
     @GetMapping("/offerings")
     public MockDataServiceResponse offerings(@RequestParam Boolean throwException) throws ChaosEngineeringException, ExecutionException, InterruptedException {
-        //LOGGER.debug("Invoking DecoratedController with Bulkhead count {} ", atomicInteger.incrementAndGet());
         if (throwException) {
             throw new ChaosEngineeringException("Something went wrong!!");
         }
-        return callBulkheadDecoratedService();
+        return callThreadPoolBulkheadAndTimeLimiterDecoratedService();
     }
 
     @GetMapping("/offeringsWithRetry")
     public MockDataServiceResponse offeringsWithRetry(@RequestParam Boolean throwException) throws ChaosEngineeringException, ExecutionException, InterruptedException {
-        //LOGGER.debug("Invoking DecoratedController with Bulkhead count {} ", atomicInteger.incrementAndGet());
         if (throwException) {
             throw new ChaosEngineeringException("Something went wrong!!");
         }
@@ -80,17 +81,17 @@ public class DecoratedController<T, R> {
      * @throws RuntimeException
      */
     @GetMapping("/offeringsById")
-    public MockDataServiceResponse offeringsById(@RequestParam String offerId, @RequestParam Boolean throwException)
-            throws Throwable {
+    public MockDataServiceResponse offeringsById(@RequestParam String offerId, @RequestParam Boolean throwException) {
         if (throwException) {
             throw new ChaosEngineeringException("Something went wrong!!");
         }
-        return callBulkheadDecoratedService(offerId);
+        return callSemaphoreBulkheadDecoratedService(offerId);
     }
 
-    private MockDataServiceResponse callBulkheadDecoratedService() throws ExecutionException, InterruptedException {
+    //////////////////////////////////   Private methods
+    private MockDataServiceResponse callThreadPoolBulkheadAndTimeLimiterDecoratedService() throws ExecutionException, InterruptedException {
         handlePublisherEvents(threadPoolBulkhead);
-        Supplier<MockDataServiceResponse> serviceAsSupplier = createServiceAsSupplier();
+//        Supplier<MockDataServiceResponse> serviceAsSupplier = createServiceAsSupplier();
 //        Supplier<CompletionStage<MockDataServiceResponse>> decorate = Decorators.ofSupplier(serviceAsSupplier)
 //                .withThreadPoolBulkhead(threadPoolBulkhead)
 //                .decorate();
@@ -99,22 +100,19 @@ public class DecoratedController<T, R> {
                 .ofSupplier(() -> chaosEngineeringDataService.getMockOfferingsDataFromService())
                 .withThreadPoolBulkhead(threadPoolBulkhead)
                 .withTimeLimiter(timeLimiter, Executors.newSingleThreadScheduledExecutor())
-                .withFallback(BulkheadFullException.class, (e) -> {
-                    MockDataServiceResponse mockDataServiceResponse = new MockDataServiceResponse();
-                    mockDataServiceResponse.setHostedRegion(String.format("Request failed due to bulkheadName {%s} BulkheadFullException", e.getMessage()));
-                    return mockDataServiceResponse;
-
-                })
-                .withFallback(TimeoutException.class, (e) -> {
-                    MockDataServiceResponse mockDataServiceResponse = new MockDataServiceResponse();
-                    mockDataServiceResponse.setHostedRegion(String.format("Request failed due to TimeLimiter {%s} with duration {%s} due to TimeoutException",
-                            timeLimiter.getName(),
-                            timeLimiter.getTimeLimiterConfig().getTimeoutDuration()));
-                    return mockDataServiceResponse;
-
-                })
+                .withFallback(BulkheadFullException.class, (e) -> getFallbackMockDataServiceResponse(
+                        String.format("Request failed due to bulkheadName {%s} BulkheadFullException", e.getMessage())))
+                .withFallback(TimeoutException.class, (e) -> getFallbackMockDataServiceResponse(
+                        String.format("Request failed due to TimeLimiter {%s} with duration {%s} due to TimeoutException",
+                                timeLimiter.getName(), timeLimiter.getTimeLimiterConfig().getTimeoutDuration())))
                 .get().toCompletableFuture();
         return future.get();
+    }
+
+    private MockDataServiceResponse getFallbackMockDataServiceResponse(String message) {
+        MockDataServiceResponse mockDataServiceResponse = new MockDataServiceResponse();
+        mockDataServiceResponse.setHostedRegion(message);
+        return mockDataServiceResponse;
     }
 
     private MockDataServiceResponse callBulkheadAndRetryDecoratedService() throws ExecutionException, InterruptedException {
@@ -127,10 +125,12 @@ public class DecoratedController<T, R> {
                 .withThreadPoolBulkhead(threadPoolBulkhead)
                 .withRetry(retryContext, Executors.newSingleThreadScheduledExecutor())
                 .decorate();
-        return decorate.get().toCompletableFuture().get();
+        CompletableFuture<MockDataServiceResponse> mockDataServiceResponseCompletionStage = decorate.get().toCompletableFuture();
+        //return mockDataServiceResponseCompletionStage.getNow( getFallbackMockDataServiceResponse("Failed with Bulkhead and Retry"));
+        return mockDataServiceResponseCompletionStage.get();
     }
 
-    private MockDataServiceResponse callBulkheadDecoratedService(String offerId) {
+    private MockDataServiceResponse callSemaphoreBulkheadDecoratedService(String offerId) {
         handlePublisherEvents(bulkhead);
         Callable<MockDataServiceResponse> callable = () -> {
             LOGGER.info("Invoking DecoratedController with Bulkhead offerId: {} count {} ", offerId, atomicInteger.incrementAndGet());
@@ -140,24 +140,13 @@ public class DecoratedController<T, R> {
                 .withBulkhead(bulkhead)
                 .decorate();
         return Try.ofCallable(decoratedCallable)
-                .onFailure(throwable -> {
-                    LOGGER.error(" Failure reason {} ", throwable.getMessage(), throwable);
-                    if (HttpServerErrorException.class.isInstance(throwable)) {
-                        if (((HttpServerErrorException) throwable).getStatusCode() == HttpStatus.INTERNAL_SERVER_ERROR) {
-                            LOGGER.error(" Failure reason -> Server threw exception {} ", throwable.getMessage());
-                        }
-                    } else {
-                        LOGGER.error(" Failure reason -> Bulkhead exception {} ", throwable.getMessage());
-                    }
-                })
-                .getOrElse(() -> {
-                    MockDataServiceResponse mockResponse = new MockDataServiceResponse();
-                    mockResponse.setHostedRegion(String.format("Request with OfferId {%s} failed due to bulkhead {%s} full", offerId, bulkhead.getName()));
-                    return mockResponse;
-                });
+                .onFailure(throwable -> LOGGER.error(" Failure reason {} ", throwable.getMessage(), throwable))
+                .recoverWith(throwable -> Try.success(getFallbackMockDataServiceResponse(
+                        String.format("Request with OfferId {%s} failed due to bulkhead {%s} full", offerId, bulkhead.getName()))))
+                .get();
     }
 
-    public Supplier<MockDataServiceResponse> createServiceAsSupplier() {
+    private Supplier<MockDataServiceResponse> createServiceAsSupplier() {
         handlePublisherEvents(bulkhead);
         Supplier<MockDataServiceResponse> mockDataServiceResponseSupplier = (() -> {
             LOGGER.info("Invoking DecoratedController with Bulkhead count {} ", atomicInteger.incrementAndGet());
@@ -174,37 +163,17 @@ public class DecoratedController<T, R> {
         return stringMockDataServiceResponseFunction;
     }
 
-
-    private void handlePublisherEvents(Bulkhead bulkhead) {
-        bulkhead.getEventPublisher()
-                .onCallPermitted(event -> LOGGER.debug("Bulkhead Successful remote call {} ", Thread.currentThread().getName()))
-                .onCallRejected(event -> LOGGER.warn("Bulkhead Rejected remote call {} ", Thread.currentThread().getName()))
-                .onCallFinished(event -> LOGGER.debug("Bulkhead Call Finished {} ", event));
-    }
-
-    private void handlePublisherEvents(ThreadPoolBulkhead threadPoolBulkhead) {
-        threadPoolBulkhead.getEventPublisher()
-                .onCallPermitted(event -> LOGGER.debug("ThreadPoolBulkhead Successful remote call {} ", Thread.currentThread().getName()))
-                .onCallRejected(event -> LOGGER.warn("ThreadPoolBulkhead Rejected remote call {} ", Thread.currentThread().getName()))
-                .onCallFinished(event -> LOGGER.debug("ThreadPoolBulkhead Call Finished {} ", event));
-    }
-
-    private void handlePublishedEvents(Retry retry) {
-        retry.getEventPublisher()
-                .onError(event -> LOGGER.error(" Retry Event on Error {}", event))
-                .onRetry(event -> LOGGER.info(" Retry Event on Retry {}", event))
-                .onSuccess(event -> LOGGER.info(" Retry Event on Success {}", event))
-                .onEvent(event -> LOGGER.debug(" Retry Event occurred records all events Retry, error and success {}", event));
-    }
-
     private RetryConfig createRetryConfig() {
         IntervalFunction intervalWithCustomExponentialBackoff = IntervalFunction
                 .ofExponentialBackoff(500l, 5d);
         return RetryConfig.custom()
                 .intervalFunction(intervalWithCustomExponentialBackoff)
                 .maxAttempts(5)
-                .retryExceptions(ConnectException.class, ResourceAccessException.class, HttpServerErrorException.class,
-                        ExecutionException.class, WebClientResponseException.class)
+                .retryExceptions(ConnectException.class,
+                        ResourceAccessException.class,
+                        HttpServerErrorException.class,
+                        ExecutionException.class,
+                        WebClientResponseException.class)
                 .build();
     }
 
@@ -243,4 +212,39 @@ public class DecoratedController<T, R> {
         return bulkheadRegistry.bulkhead(SEMAPHORE_BULKHEAD);
     }
 
+    private CircuitBreaker createCircuitBreaker() {
+        CircuitBreakerConfig circuitBreakerConfig = CircuitBreakerConfig.custom()
+                .failureRateThreshold(25)
+                .waitDurationInOpenState(Duration.ofMillis(10000))
+                .permittedNumberOfCallsInHalfOpenState(2)
+                .slidingWindowSize(4)
+                .recordExceptions(ConnectException.class, ResourceAccessException.class, HttpServerErrorException.class)
+                .ignoreExceptions(ChaosEngineeringException.class)
+                .build();
+        CircuitBreakerRegistry circuitBreakerRegistry = CircuitBreakerRegistry.of(circuitBreakerConfig);
+        return circuitBreakerRegistry.circuitBreaker(CIRCUIT_BREAKER);
+    }
+
+    //Monitoring by just logging
+    private void handlePublisherEvents(Bulkhead bulkhead) {
+        bulkhead.getEventPublisher()
+                .onCallPermitted(event -> LOGGER.debug("Bulkhead Successful remote call {} ", Thread.currentThread().getName()))
+                .onCallRejected(event -> LOGGER.warn("Bulkhead Rejected remote call {} ", Thread.currentThread().getName()))
+                .onCallFinished(event -> LOGGER.debug("Bulkhead Call Finished {} ", event));
+    }
+
+    private void handlePublisherEvents(ThreadPoolBulkhead threadPoolBulkhead) {
+        threadPoolBulkhead.getEventPublisher()
+                .onCallPermitted(event -> LOGGER.debug("ThreadPoolBulkhead Successful remote call {} ", Thread.currentThread().getName()))
+                .onCallRejected(event -> LOGGER.warn("ThreadPoolBulkhead Rejected remote call {} ", Thread.currentThread().getName()))
+                .onCallFinished(event -> LOGGER.debug("ThreadPoolBulkhead Call Finished {} ", event));
+    }
+
+    private void handlePublishedEvents(Retry retry) {
+        retry.getEventPublisher()
+                .onError(event -> LOGGER.error(" Retry Event on Error {}", event))
+                .onRetry(event -> LOGGER.info(" Retry Event on Retry {}", event))
+                .onSuccess(event -> LOGGER.info(" Retry Event on Success {}", event))
+                .onEvent(event -> LOGGER.debug(" Retry Event occurred records all events Retry, error and success {}", event));
+    }
 }
