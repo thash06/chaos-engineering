@@ -15,12 +15,12 @@
  ******************************************************************************/
 package com.fidelity.fbt.chaos.refapp.service;
 
+import com.fidelity.fbt.chaos.refapp.exception.ChaosEngineeringException;
 import com.fidelity.fbt.chaos.refapp.model.MockDataServiceResponse;
 import com.fidelity.fbt.chaos.refapp.model.Offering;
 import com.fidelity.fbt.chaos.refapp.repository.ChaosEngineeringDataRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.stereotype.Service;
 
@@ -30,29 +30,29 @@ import java.util.concurrent.atomic.AtomicInteger;
 //import com.amazonaws.regions.Region;
 //import com.amazonaws.regions.Regions;
 
-/**
- * @author souadhik
- *
- */
+
 @Service
 @Component(value = "chaosEngineeringDataService")
 public class ChaosEngineeringDataServiceImpl implements ChaosEngineeringDataService {
 	private static Logger LOGGER = LoggerFactory.getLogger(ChaosEngineeringDataServiceImpl.class);
 
 	private AtomicInteger atomicInteger = new AtomicInteger(0);
-	/**
-	 *  Dependency for repository layer
-	 */
-	@Autowired
-	private ChaosEngineeringDataRepository chaosEngineeringDataRepository;
+	private final ChaosEngineeringDataRepository chaosEngineeringDataRepository;
+
+	public ChaosEngineeringDataServiceImpl(ChaosEngineeringDataRepository chaosEngineeringDataRepository){
+		this.chaosEngineeringDataRepository = chaosEngineeringDataRepository;
+	}
 
 	/**
 	 * This function returns sample data from the repository layer along
 	 * with the hosted AWS region!
 	 */
 	@Override
-	public MockDataServiceResponse getMockOfferingsDataFromService() {
-		LOGGER.debug("Invoking ChaosEngineeringDataServiceImpl count {}", atomicInteger.incrementAndGet());
+	public MockDataServiceResponse getMockOfferingsDataFromService(boolean throwException) throws ChaosEngineeringException {
+		LOGGER.debug("Invoking ChaosEngineeringDataServiceImpl throwException {} count {}", throwException, atomicInteger.incrementAndGet());
+		if (throwException) {
+			throw new ChaosEngineeringException("Something went wrong!!");
+		}
 		String hostedRegion = "";
 
 //		Region region = Regions.getCurrentRegion();
@@ -69,8 +69,11 @@ public class ChaosEngineeringDataServiceImpl implements ChaosEngineeringDataServ
 	}
 
 	@Override
-	public MockDataServiceResponse getMockOfferingsDataFromService(String id) {
-		//LOGGER.info("Invoking ChaosEngineeringDataServiceImpl count {}", atomicInteger.incrementAndGet());
+	public MockDataServiceResponse getMockOfferingsDataFromService(String id, boolean throwException) throws ChaosEngineeringException{
+		LOGGER.info("Invoking ChaosEngineeringDataServiceImpl throwException {} count {}", throwException, atomicInteger.incrementAndGet());
+		if (throwException) {
+			throw new ChaosEngineeringException("Something went wrong!!");
+		}
 		String hostedRegion = "";
 
 //		Region region = Regions.getCurrentRegion();

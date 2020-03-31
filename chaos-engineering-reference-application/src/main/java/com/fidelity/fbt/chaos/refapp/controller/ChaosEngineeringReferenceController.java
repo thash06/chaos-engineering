@@ -33,7 +33,7 @@ public class ChaosEngineeringReferenceController {
         if (throwException) {
             throw new ChaosEngineeringException("Something went wrong!!");
         }
-        return chaosEngineeringDataService.getMockOfferingsDataFromService();
+        return chaosEngineeringDataService.getMockOfferingsDataFromService(throwException);
     }
 
     /**
@@ -45,7 +45,7 @@ public class ChaosEngineeringReferenceController {
         if (throwException) {
             throw new ChaosEngineeringException("Something went wrong!!");
         }
-        return chaosEngineeringDataService.getMockOfferingsDataFromService(offerId);
+        return chaosEngineeringDataService.getMockOfferingsDataFromService(offerId, throwException);
 	}
 
 }

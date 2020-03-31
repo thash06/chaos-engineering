@@ -24,7 +24,7 @@ public interface ChaosEngineeringDataService {
 	/**
 	 * @return
 	 */
-	MockDataServiceResponse getMockOfferingsDataFromService();
+	MockDataServiceResponse getMockOfferingsDataFromService(boolean throwException);
 
-	MockDataServiceResponse getMockOfferingsDataFromService(String id);
+	MockDataServiceResponse getMockOfferingsDataFromService(String id, boolean throwException);
 }
