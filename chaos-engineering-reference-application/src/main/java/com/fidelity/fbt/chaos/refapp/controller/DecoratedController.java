@@ -38,14 +38,28 @@ public class DecoratedController<T, R> {
      * @throws RuntimeException
      */
     @GetMapping("/offeringsById")
-    public MockDataServiceResponse offeringsById(@RequestParam String offerId, @RequestParam Boolean throwException) throws ChaosEngineeringException{
+    public MockDataServiceResponse offeringsById(@RequestParam String offerId, @RequestParam Boolean throwException) throws ChaosEngineeringException {
         try {
             return decoratedSupplier.callSemaphoreBulkheadDecoratedService(offerId, throwException);
-        }catch (ChaosEngineeringException e){
+        } catch (ChaosEngineeringException e) {
             LOGGER.error("Caught error in controller {}", e.getMessage());
             throw e;
         }
     }
 
 
+    /**
+     * @return
+     * @throws RuntimeException
+     */
+    @GetMapping("/degradingService")
+    public MockDataServiceResponse degradingOfferings(@RequestParam Boolean throwException) throws ChaosEngineeringException,
+            InterruptedException, ExecutionException {
+        try {
+            return decoratedSupplier.callDegradingOfferingsUsingSemaphoreBulkheadDecoratedService(throwException);
+        } catch (ChaosEngineeringException e) {
+            LOGGER.error("Caught error in controller {}", e.getMessage());
+            throw e;
+        }
+    }
 }
