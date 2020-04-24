@@ -108,6 +108,8 @@ It stays in Open state for waitDurationInOpenState() milliseconds then allows th
         return circuitBreakerRegistry.circuitBreaker(DATA_SERVICE);
     }
 ## Time Limiter
+The code snippet below creates a TimeLimiter with a configurableTimeout duration which states that if the remote call execution 
+takes longer than the timeoutDuration() the call is terminated and an exception or a cached/fallback value returned to caller.
 
 ```
     private TimeLimiter createTimeLimiter(int waitTimeForThread) {
@@ -130,10 +132,15 @@ It stays in Open state for waitDurationInOpenState() milliseconds then allows th
     }
 ```
 
-The code snippet above creates a TimeLimiter with a configurableTimeout duration which states that if the remote call execution 
-takes longer than the timeoutDuration() the call is terminated and an exception or a cached/fallback value returned to caller.
 
 ## Rate Limiter
+Rate limiting is an imperative technique to prepare your API for scale and establish high availability and reliability of 
+your service.
+The code snippet below creates a RateLimiter instance which allows only a specified number of calls (`limitForPeriod(limitForPeriod)`)
+in a time window (`limitRefreshPeriod(Duration.ofSeconds(windowInSeconds))`). Calls that exceed the limit can wait for
+the duration specified in (`timeoutDuration(Duration.ofMillis(waitTimeForThread))`). 
+Requests that do  not get processed within the `limitRefreshPeriod + timeoutDuration` are rejected.
+
 ```
     private RateLimiter createRateLimiter(int limitForPeriod, int windowInSeconds, int waitTimeForThread) {
         RateLimiterConfig rateLimiterConfig = RateLimiterConfig.custom()
@@ -161,12 +168,6 @@ takes longer than the timeoutDuration() the call is terminated and an exception 
         }
     }
 ```
-Rate limiting is an imperative technique to prepare your API for scale and establish high availability and reliability of 
-your service.
-The code snippet above creats a RateLimiter instance which allows only a specified number of calls (_limitForPeriod(limitForPeriod)_)
-in a time window (_limitRefreshPeriod(Duration.ofSeconds(windowInSeconds))_). Calls that exceed the limit can wait for
-the duration specified in (_timeoutDuration(Duration.ofMillis(waitTimeForThread))_). 
-Requests that do  not get processed within the _limitRefreshPeriod + timeoutDuration_ are rejected.
 
 ## Bulkhead
 Used to limit the number of concurrent calls to a service. If clients send more than the number of concurrent calls 
