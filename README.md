@@ -273,6 +273,39 @@ A small test stub that simulates sending 20 concurrent requests is shown below.
     }
 ```
  
+### Caching using Redis
+An effective 'recovery' option from any of the above failures could be a fallback response from a cache.
+Resiliency4j allows chaining of Supplier with a cache. The code snippet below shows how to create
+a cache using Redis as provider. When `callRemoteService` it first checks if the offerId is available in cache
+and if it finds a match then it returns the value from cache rather than making a remote call. This pattern could easily
+be used as a fallback option.
+
+
+``
+
+    private Cache<Object, Object> createCache() {
+        MutableConfiguration<Object, Object> config = new MutableConfiguration<>();
+        try {
+            URI redissonConfigUri = getClass().getResource("/redisson-jcache.yml").toURI();
+            cacheManager = Caching.getCachingProvider("org.redisson.jcache.JCachingProvider")
+                    .getCacheManager(redissonConfigUri, null);
+            Cache<Object, Object> cache = Cache.of(cacheManager.createCache(DATA_SERVICE, config));
+            return cache;
+        } catch (URISyntaxException e) {
+            LOGGER.error("{}", e.getMessage(), e);
+        }
+        //Fix this
+        return null;
+    }
+    
+    private <T> T callRemoteService(String offerId, Boolean throwException) throws Throwable {
+        handlePublishedEvents(cache);
+        Function<Object, Object> decorateSupplier = Cache.decorateSupplier(cache,
+                () -> (T) resiliencyDataService.getDatafromRemoteService(offerId, throwException));
+        Object returnValue = decorateSupplier.apply(offerId);
+        return (T) returnValue;
+    }
+``
 ## Demo of chaos-engineering-reference-application
  
  The producer application has decorated controller `DecoratedController` for use cases where the consumer does not want to 
