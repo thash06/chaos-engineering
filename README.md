@@ -110,6 +110,8 @@ It stays in Open state for waitDurationInOpenState() milliseconds then allows th
 ## Time Limiter
 The code snippet below creates a TimeLimiter with a configurableTimeout duration which states that if the remote call execution 
 takes longer than the `timeoutDuration()` the call is terminated and an exception or a cached/fallback value returned to caller.
+One important caveat about the `cancelRunningFuture(true)` is that it only works when TimeLimiter is used to decorate 
+a method which returns a Future. 
 
 ```
     private TimeLimiter createTimeLimiter(int waitTimeForThread) {
