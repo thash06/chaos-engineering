@@ -28,7 +28,7 @@ The `DecoratedSupplier` has examples of chaining different patterns together as 
 ### Retry with exponential backoff
 In the event of failure due to unavailability or any of the Exceptions listed in `retryExceptions()` method listed below, 
 applications can choose to return a fallback/default return value or choose to keep the connection open and retry the endpoint which threw the error.
-The retry logic make use of a simple bounded/timed retries or advanced retrying methods such as  exponential backoff. 
+The retry logic can use simple bounded/timed retries or advanced retrying methods such as  exponential backoff. 
 
 The code snippet below creates a retry config which allows a maximum of 5 retries where the first retry will be after 
 5000 milliseconds and each subsequent retry will be a multiple (2 in this case) of the previous. 
@@ -66,15 +66,15 @@ cascade of failures when a remote service is down.
 CircuitBreaker has 3 states- 
 - **OPEN** -  Rejects calls to remote service with a CallNotPermittedException when it is OPEN.
 - **HALF_OPEN** - Permits a configurable number of calls to see if the backend is still unavailable or has become available again.
-- **CLOSED** - Calls can be made to the remote system. This happens when the failure rate and slow call rate is below the threshold.
+- **CLOSED** - Calls can be made to the remote system. This happens when the failure rate is below the threshold.
 
 Two other states are also supported
 - **DISABLED** - always allow access.
 - **FORCED_OPEN** - always deny access
 
 The transition happens from `CLOSED` to `OPEN` state based upon 
-1. How many of the last N calls have failed(Count based sliding window) or  
-2. How many failures did we have in the last N minutes (or any other duration) called Time based sliding window.
+- **Count based sliding window** -  How many of the last N calls have failed. 
+- **Time based sliding window** - How many failures occurred in the last N minutes (or any other duration).
 
 
 A few settings can be configured for a Circuit Breaker:
