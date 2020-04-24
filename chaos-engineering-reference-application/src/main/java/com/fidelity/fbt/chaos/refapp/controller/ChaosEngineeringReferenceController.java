@@ -28,6 +28,16 @@ public class ChaosEngineeringReferenceController {
      * @return
      * @throws RuntimeException
      */
+    @GetMapping("/vanillaOfferings")
+    public MockDataServiceResponse offerings() throws ChaosEngineeringException {
+
+        return chaosEngineeringDataService.getMockOfferingsDataFromService(false);
+    }
+
+    /**
+     * @return
+     * @throws RuntimeException
+     */
     @GetMapping("/offerings")
     public MockDataServiceResponse offerings(@RequestParam Boolean throwException) throws ChaosEngineeringException {
         if (throwException) {

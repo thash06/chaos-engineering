@@ -1,9 +1,7 @@
 package com.fidelity.fbt.chaos.refapp.controller;
 
 import com.fidelity.fbt.chaos.refapp.ChaosEngineeringReferenceApplication;
-import com.fidelity.fbt.chaos.refapp.exception.ChaosEngineeringException;
 import com.fidelity.fbt.chaos.refapp.model.MockDataServiceResponse;
-import com.fidelity.fbt.chaos.refapp.service.ChaosEngineeringDataService;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
@@ -15,20 +13,16 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.boot.web.server.LocalServerPort;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
-import javax.validation.constraints.AssertTrue;
-import java.net.URI;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @SpringBootTest(classes = ChaosEngineeringReferenceApplication.class,
         webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
@@ -172,6 +166,7 @@ class DecoratedControllerTest {
                 .doOnError(throwable -> LOGGER.error("ToFuture Error type {} and cause {}", throwable.getClass(), throwable.getCause()))
                 .toFuture();
         try {
+
             //MockDataServiceResponse response1 = one.toFuture().get();
             //MockDataServiceResponse response2 = two.toFuture().get();
             List<MockDataServiceResponse> successfulRequests = listCompletableFuture.get().stream()

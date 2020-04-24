@@ -3,7 +3,7 @@ spring:
   jackson.serialization.indent_output: true
 
 server:
-  port: 8080
+  port: 9090
 
 chaos:
   monkey:

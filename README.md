@@ -7,17 +7,17 @@ bringing down a system built upon microservices.
 Hystrix one of the pioneer frameworks providing such functionality has been in maintenance mode since 2018 and Resiliency4j 
 has been filing the void.
 
-Resilience4j is a framework that provides higher-order functions (decorators) and/or annotationsto enhance any method call, 
+Resilience4j is a framework that provides higher-order functions (decorators) and/or annotations to enhance any method call, 
 functional interface, lambda expression or method reference with a Circuit Breaker, Rate Limiter, Retry or Bulkhead. 
 We can choose to use one or more of these "Decorators" to meet our resiliency objective.
 
 ## Retry with exponential backoff
-In the even of failure due to unavailability or any of the Exceptions listed in retryExceptions() method listed below, 
+In the event of failure due to unavailability or any of the Exceptions listed in retryExceptions() method listed below, 
 applications can choose to return a fallback/default return value or choose to keep the connection open and retry the endpoint which threw the error.
 The retry logic can make use of a feature called exponential backoff. 
 
 The code snippet below creates a retry config which allows a maximum of 5 retries where the first retry will be after 
-5000 milliseconds and each subsequent retry will be a multiple(2 in this case) of the previous. 
+5000 milliseconds and each subsequent retry will be a multiple (2 in this case) of the previous. 
 
     private <T> T executeWithRetry(Supplier<T> supplier, Function<Throwable, T> fallback) {
         Retry retry = Retry.of(DATA_SERVICE, this::createRetryConfig);
@@ -58,28 +58,30 @@ Two other states are also supported
 - **DISABLED** - always allow access.
 - **FORCED_OPEN** - always deny access
 
-The transition happens from CLOSED to OPEN state based upon 
+The transition happens from `CLOSED` to `OPEN` state based upon 
 1. How many of the last N calls have failed(Count based sliding window) or  
-2. How many failures did we have in the last N minutes(or any other duration) called Time based sliding window.
+2. How many failures did we have in the last N minutes (or any other duration) called Time based sliding window.
 
 
 A few settings can be configured for a Circuit Breaker:
 
-1. The failure rate threshold above which the CircuitBreaker opens and starts short-circuiting calls
-2.  The wait duration which defines how long the CircuitBreaker should stay open before it switches to HALF_OPEN.
-3.  A custom CircuitBreakerEventListener which handles CircuitBreaker events
+1. The failure rate threshold above which the CircuitBreaker opens and starts short-circuiting calls.
+2. The wait duration which defines how long the CircuitBreaker should stay open before it switches to HALF_OPEN.
+3. A custom CircuitBreakerEventListener which handles CircuitBreaker events.
 4. A Predicate which evaluates if an exception should count as a failure.
 
 
 The code snippet below configures the CircuitBreaker and registers it against a global name and then attaches it to the 
 method supplier. 
-A few important settings are discussed below and the rest are self explanatory.
-The failureRateThreshold value specifies what percentage of remote calls should fail for the state to change from CLOSED to OPEN. 
-The slidingWindowSize() property specifies the number of calls which will be used to determine the failure threshold percentage.
-Eg: If in the last 5 remote calls 20% or 1 call failed due to  ConnectException.class, ResourceAccessException.class then the 
+Two important settings are discussed below and the rest are self-explanatory.
+- **The `failureRateThreshold`** - value specifies what percentage of remote calls should fail for the state to change from CLOSED to OPEN. 
+- **The `slidingWindowSize()`** - property specifies the number of calls which will be used to determine the failure threshold percentage.
+
+Eg: If in the last 5 remote calls 20% or 1 call failed due to  `ConnectException.class, ResourceAccessException.class` then the 
 CircuitBreaker status changes to OPEN.
-It stays in Open state for waitDurationInOpenState() milliseconds then then allows the number  specified in
-permittedNumberOfCallsInHalfOpenState() to go through to determine if the status can go back to CLOSED or stay in OPEN.
+It stays in Open state for waitDurationInOpenState() milliseconds then allows the number  specified in
+`permittedNumberOfCallsInHalfOpenState()` to go through to determine if the status can go back to CLOSED or stay in OPEN.
+
 
     private <T> T executeWithCircuitBreaker(Supplier<T> supplier){
         Supplier<T> decoratedSupplier = Decorators.ofSupplier(supplier)
@@ -335,5 +337,4 @@ and 8 requests to fail due to TimeoutException exception.
 There is a unit test DecoratedControllerTest which covers these 3 methods. 
 It uses WebClient to send 10 concurrent requests for each methods inspect the responses in each case.
 
- 
  
