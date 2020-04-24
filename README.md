@@ -272,7 +272,13 @@ A small test stub that simulates sending 20 concurrent requests is shown below.
         return (T) returnValues.get(returnValues.size() - 1);
     }
 ```
- 
+Note: There are 2 Bulkhead implementations provided by Resilience4j and the decision of which one to choose can get a bit tricky.
+Here are a few points which may help with that decision.
+1. In SemaphoreBulkhead the number of concurrent threads to run is controlled by a Semaphore but the user code runs in the current Thread. 
+   Also this bulkhead returns the actual response object without wrapping it in a Future.
+2. In ThreadPoolBulkhead the number of concurrent threads to run is controlled by a ThreadPool size and the user code runs in a Thread from the ThreadPool. 
+   Also this bulkhead returns the response object wrapped in a Future. 
+   
 ### Caching using Redis
 An effective 'recovery' option from any of the above failures could be a fallback response from a cache.
 Resiliency4j allows chaining of Supplier with a cache. The code snippet below shows how to create
