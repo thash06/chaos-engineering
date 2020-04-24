@@ -163,6 +163,7 @@ public class DecoratedSupplier {
         }
     }
 
+    //////////////// Private Methods
     private MockDataServiceResponse callableWithBulkheadDecorator(String offerId, boolean throwException) {
         Callable<MockDataServiceResponse> callable = () -> {
             LOGGER.info("Invoking DecoratedController with Bulkhead offerId: {} count {} ", offerId, atomicInteger.incrementAndGet());
@@ -192,7 +193,7 @@ public class DecoratedSupplier {
                 .get();
     }
 
-    //////////////// Private Methods
+
     private Supplier<MockDataServiceResponse> createServiceAsSupplier(boolean throwException) {
         handlePublishedEvents(decoratorFactory.bulkhead);
         Supplier<MockDataServiceResponse> mockDataServiceResponseSupplier = (() -> {

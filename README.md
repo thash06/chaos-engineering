@@ -14,18 +14,21 @@ We can choose to use one or more of these "Decorators" to meet our resiliency ob
 
 
 ## Resiliency Patterns using Resilience4j
-This project is divided into 2 modules and each module demonstrates an unique approach adding a resiliency layer
+This project is divided into 2 modules and each module demonstrates a unique approach of adding a resiliency layer
 to an application.
 - **resiliency-patterns-reference-application** - Is a standalone SpringBoot application acting as a Proxy 
 meant to protect a business logic endpoint. There is  no business logic in this application and its sole purpose
-is to act as a bridge proving access to the business logic endpoint.  
+is to act as a bridge providing controlled(resilient) access to the business logic endpoint.  
  
-- **chaos-engineering-reference-application** - An application 
+- **chaos-engineering-reference-application** - An application where the controller accesses the service containing 
+the business logic through a layer called `DecoratedSupplier` which decorates the final business service endpoint
+with resiliency pattern implementations.
+The `DecoratedSupplier` has examples of chaining different patterns together as well as how to use `fallback`.
 
 ### Retry with exponential backoff
-In the event of failure due to unavailability or any of the Exceptions listed in retryExceptions() method listed below, 
+In the event of failure due to unavailability or any of the Exceptions listed in `retryExceptions()` method listed below, 
 applications can choose to return a fallback/default return value or choose to keep the connection open and retry the endpoint which threw the error.
-The retry logic can make use of a feature called exponential backoff. 
+The retry logic make use of a simple bounded/timed retries or advanced retrying methods such as  exponential backoff. 
 
 The code snippet below creates a retry config which allows a maximum of 5 retries where the first retry will be after 
 5000 milliseconds and each subsequent retry will be a multiple (2 in this case) of the previous. 
@@ -45,7 +48,7 @@ The code snippet below creates a retry config which allows a maximum of 5 retrie
                 .retryExceptions(ConnectException.class, ResourceAccessException.class)
                 .build();
     }
- The example above could very well be tuned to return a default cached/default response rather than retry with a single 
+ The example above could easily be tuned to return a default cached/default response rather than retry with a single 
  line code change.
  
     private <T> T executeWithRetry(Supplier<T> supplier, Function<Throwable, T> fallback) {
@@ -121,9 +124,9 @@ It stays in Open state for waitDurationInOpenState() milliseconds then allows th
     
     
 ### Time Limiter
-The code snippet below creates a TimeLimiter with a configurableTimeout duration which states that if the remote call execution 
+The code snippet below creates a TimeLimiter with a configurable `timeoutDuration()` which states that if the remote call execution 
 takes longer than the `timeoutDuration()` the call is terminated and an exception or a cached/fallback value returned to caller.
-One important caveat about the `cancelRunningFuture(true)` is that it only works when TimeLimiter is used to decorate 
+One important caveat about the `cancelRunningFuture()` is that the value `true` only works when TimeLimiter is used to decorate 
 a method which returns a Future. 
 For a better understanding of how this property works differently in `Future` and `CompletableFuture` refer to 
 the unit test `com.fidelity.fbt.chaos.refapp.utilTimeLimiterTest`. Run this test by switching the `cancelRunningFuture()`
@@ -157,8 +160,8 @@ https://www.nurkiewicz.com/2015/03/completablefuture-cant-be-interrupted.html?m=
 Rate limiting is an imperative technique to prepare your API for scale and establish high availability and reliability of 
 your service.
 The code snippet below creates a RateLimiter instance which allows only a specified number of calls (`limitForPeriod(limitForPeriod)`)
-in a time window (`limitRefreshPeriod(Duration.ofSeconds(windowInSeconds))`). Calls that exceed the limit can wait for
-the duration specified in (`timeoutDuration(Duration.ofMillis(waitTimeForThread))`). 
+in a time window `limitRefreshPeriod(Duration.ofSeconds(windowInSeconds))`. Calls that exceed the limit can wait for
+the duration specified in `timeoutDuration(Duration.ofMillis(waitTimeForThread))`. 
 Requests that do  not get processed within the `limitRefreshPeriod + timeoutDuration` are rejected.
 
 ```
@@ -270,16 +273,23 @@ A small test stub that simulates sending 20 concurrent requests is shown below.
     }
 ```
  
- ## Chaos-engineering-reference-application
+## Demo of chaos-engineering-reference-application
  
- The producer application also has a decorated endpoint DecoratedController for use cases where the consumer does not want to 
+ The producer application has decorated controller `DecoratedController` for use cases where the consumer does not want to 
  go through a proxy layer.
  It has 3 endpoints
  1. http://localhost:%d/decorated-services/offeringsById
  2. http://localhost:%d/decorated-services/offerings
  3. http://localhost:%d/decorated-services/offeringsWithRetry
  
-    The first end point is decorated by a just a Semaphore Bulkhead. The Bulkhead is configure with the number of available 
+There is a unit test `com.fidelity.fbt.chaos.refapp.controller.DecoratedControllerTest` which covers 3 scenarios. 
+It uses WebClient to send 10 concurrent requests to each method and inspects the responses in each case.
+Asserting the response is difficult in these test cases due to the nature of concurrent requests so some tests may fail
+in different environments.
+
+
+### How are methods chained in DecoratedController
+The first end point is decorated by a just a Semaphore Bulkhead. The Bulkhead is configure with the number of available 
 cores on the machine the application runs on. In my case it is 8 so when I send 10 concurrent requests 2 of the requests fail.
 
 ```
@@ -356,7 +366,4 @@ and 8 requests to fail due to TimeoutException exception.
 ```
 
 
-There is a unit test DecoratedControllerTest which covers these 3 methods. 
-It uses WebClient to send 10 concurrent requests for each methods inspect the responses in each case.
 
- 
