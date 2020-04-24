@@ -125,6 +125,10 @@ The code snippet below creates a TimeLimiter with a configurableTimeout duration
 takes longer than the `timeoutDuration()` the call is terminated and an exception or a cached/fallback value returned to caller.
 One important caveat about the `cancelRunningFuture(true)` is that it only works when TimeLimiter is used to decorate 
 a method which returns a Future. 
+For a better understanding of how this property works differently in `Future` and `CompletableFuture` refer to 
+the unit test `com.fidelity.fbt.chaos.refapp.utilTimeLimiterTest`. 
+To gain a better understanding of why `CompletableFuture` cannot be interrupted refer to this fantastic tutorial.
+https://www.nurkiewicz.com/2015/03/completablefuture-cant-be-interrupted.html?m=1
 
 ```
     private TimeLimiter createTimeLimiter(int waitTimeForThread) {
