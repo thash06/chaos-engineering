@@ -11,7 +11,18 @@ Resilience4j is a framework that provides higher-order functions (decorators) an
 functional interface, lambda expression or method reference with a Circuit Breaker, Rate Limiter, Retry or Bulkhead. 
 We can choose to use one or more of these "Decorators" to meet our resiliency objective.
 
-## Retry with exponential backoff
+
+
+## Resiliency Patterns using Resilience4j
+This project is divided into 2 modules and each module demonstrates an unique approach adding a resiliency layer
+to an application.
+- **resiliency-patterns-reference-application** - Is a standalone SpringBoot application acting as a Proxy 
+meant to protect a business logic endpoint. There is  no business logic in this application and its sole purpose
+is to act as a bridge proving access to the business logic endpoint.  
+ 
+- **chaos-engineering-reference-application** - An application 
+
+### Retry with exponential backoff
 In the event of failure due to unavailability or any of the Exceptions listed in retryExceptions() method listed below, 
 applications can choose to return a fallback/default return value or choose to keep the connection open and retry the endpoint which threw the error.
 The retry logic can make use of a feature called exponential backoff. 
@@ -45,7 +56,7 @@ The code snippet below creates a retry config which allows a maximum of 5 retrie
                 .get();
     }
     
-## CircuitBreaker
+### CircuitBreaker
 In cases where default value is not an option and the remote system does not "heal" or respond even after repeated retries 
 we can prevent further calls to the downstream system. The Circuit Breaker is one such method which helps us in preventing a 
 cascade of failures when a remote service is down.
@@ -107,7 +118,9 @@ It stays in Open state for waitDurationInOpenState() milliseconds then allows th
         CircuitBreakerRegistry circuitBreakerRegistry = CircuitBreakerRegistry.of(circuitBreakerConfig);
         return circuitBreakerRegistry.circuitBreaker(DATA_SERVICE);
     }
-## Time Limiter
+    
+    
+### Time Limiter
 The code snippet below creates a TimeLimiter with a configurableTimeout duration which states that if the remote call execution 
 takes longer than the `timeoutDuration()` the call is terminated and an exception or a cached/fallback value returned to caller.
 One important caveat about the `cancelRunningFuture(true)` is that it only works when TimeLimiter is used to decorate 
@@ -135,7 +148,7 @@ a method which returns a Future.
 ```
 
 
-## Rate Limiter
+### Rate Limiter
 Rate limiting is an imperative technique to prepare your API for scale and establish high availability and reliability of 
 your service.
 The code snippet below creates a RateLimiter instance which allows only a specified number of calls (`limitForPeriod(limitForPeriod)`)
@@ -171,7 +184,7 @@ Requests that do  not get processed within the `limitRefreshPeriod + timeoutDura
     }
 ```
 
-## Bulkhead
+### Bulkhead
 Used to limit the number of concurrent calls to a service. If clients send more than the number of concurrent calls 
 (**referred to as the saturation point and configured using the maxConcurrentCalls()**) than the service is configured to handle, 
 a Bulkhead decorated service protects it from getting overwhelmed by keeping the additional calls waiting for a preconfigured time 
@@ -252,7 +265,8 @@ A small test stub that simulates sending 20 concurrent requests is shown below.
     }
 ```
  
- ##Chaos-engineering-reference-application
+ ## Chaos-engineering-reference-application
+ 
  The producer application also has a decorated endpoint DecoratedController for use cases where the consumer does not want to 
  go through a proxy layer.
  It has 3 endpoints
